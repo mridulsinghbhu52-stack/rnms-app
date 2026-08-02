@@ -6,7 +6,7 @@ Core MVP: Login/Roles -> मद/GO/आय -> कार्य/टेंडर/व
 import os
 from datetime import datetime, date
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import db
@@ -484,15 +484,16 @@ def new_payment(bill_id):
     work = db.fetchone(conn, "SELECT * FROM works WHERE work_id=?", (bill["work_id"],))
     latest_tender = db.fetchone(conn, "SELECT * FROM tenders WHERE work_id=? ORDER BY tender_id DESC LIMIT 1", (work["work_id"],))
     gross = float(bill["amount_incl_gst"])
+    taxable_value = float(bill["amount_excl_gst"])
     no_deduction = bool(request.form.get("no_deduction"))
     include_cess = bool(request.form.get("include_labour_cess"))
     if no_deduction:
         cgst = sgst = income_tax = labour_cess = 0.0
     else:
-        cgst = round(gross * 0.01, 2)
-        sgst = round(gross * 0.01, 2)
-        income_tax = round(gross * 0.02, 2)
-        labour_cess = round(gross * 0.01, 2) if include_cess else 0.0
+        cgst = round(taxable_value * 0.01, 2)
+        sgst = round(taxable_value * 0.01, 2)
+        income_tax = round(taxable_value * 0.02, 2)
+        labour_cess = round(taxable_value * 0.01, 2) if include_cess else 0.0
     total_deduction = round(cgst + sgst + income_tax + labour_cess, 2)
     net_payment = round(gross - total_deduction, 2)
     prior_posted = db.fetchone(conn, "SELECT COALESCE(SUM(net_payment),0) AS v FROM payments WHERE work_id=? AND status='POSTED'", (work["work_id"],))["v"]
@@ -646,6 +647,362 @@ def bootstrap():
 
 
 bootstrap()
+
+# =============================================================================
+# RNMS — MASTER FILE — इस पूरी फ़ाइल की सामग्री अपने app.py के सबसे नीचे
+# पेस्ट करें (अगर फ़ाइल के अंत में "if __name__ == "__main__":" जैसी कोई
+# लाइन है, तो उससे पहले)। इसमें तीन चीज़ें हैं:
+#   भाग A — Bulk Legacy-Import Module (95 कार्य + 10 GO डालने के लिए)
+#   भाग B — Documents Module (GO/Estimate/Photo/Tender/Agreement/MB/Voucher अपलोड)
+#
+# ⚠️ याद रखें — new_payment() वाला भुगतान-गणना सुधार यहां नहीं है, वह अलग से
+# "fix_payment_deduction.py" में है क्योंकि वह मौजूदा फ़ंक्शन को REPLACE करता
+# है, यहां जोड़ने वाली बात नहीं है (MASTER_GUIDE.md में चरण 5 देखें)।
+#
+# ⚠️ पेस्ट करने से पहले अपने app.py की शुरुआत में देख लें:
+#   1. "from flask import ..." में "jsonify" शामिल है क्या? नहीं है तो जोड़ दें।
+#   2. अगर पहले से "import csv" या "import io" है तो नीचे वाली डुप्लीकेट लाइनें
+#      हटा सकते हैं (दोबारा import करना भी सुरक्षित है, ज़रूरी नहीं)।
+#   3. @require_role(...) में इस्तेमाल हुए role names (ADMIN, EO,
+#      ACCOUNT_OPERATOR, JE) अपने असली role names से मिला लें।
+# =============================================================================
+
+import csv
+import io
+import storage_r2
+
+# #############################################################################
+# भाग A — Bulk Legacy-Import Module (Admin only)
+# #############################################################################
+
+SEED_SCHEMES = [
+    # code,      name,                                              category,                      interest_usable, non_tender_allowed
+    ("CMNSY",  "मुख्यमंत्री नगर सृजन योजना",                         "STATE_SCHEME",              False, False),
+    ("CMVNY",  "मुख्यमंत्री वैश्विक नगरोदय योजना",                    "STATE_SCHEME",              False, False),
+    ("AAK",    "आकांक्षी नगर योजना",                                 "STATE_SCHEME",              False, False),
+    ("ADARSH", "पं. दीनदयाल/आदर्श नगर योजना",                         "STATE_SCHEME",              False, False),
+    ("ANTYESHTI", "अन्त्येष्टि स्थल योजना",                          "STATE_SCHEME",              False, False),
+    ("TALAB",  "तालाब/झील/पोखरा संरक्षण योजना",                       "STATE_SCHEME",              False, False),
+    ("PEYJAL", "पेयजल योजना",                                        "STATE_SCHEME",              False, False),
+    ("SFC",    "राज्य वित्त आयोग",                                    "STATE_FINANCE_COMMISSION",  True,  True),
+    ("CFC",    "केन्द्रीय वित्त आयोग — Tied/Untied",                   "CENTRAL_FINANCE_COMMISSION",True,  False),
+    ("NIKAY",  "निकाय निधि",                                         "NIKAY_NIDHI",                True,  True),
+    ("OTHER",  "अन्य स्वीकृत मद/योजना",                                "OTHER",                      False, False),
+]
+
+SEED_FY = [
+    # fy_name,   start_date,   end_date,     is_current
+    ("2022-23", "2022-04-01", "2023-03-31", False),
+    ("2023-24", "2023-04-01", "2024-03-31", False),
+    ("2024-25", "2024-04-01", "2025-03-31", False),
+    ("2025-26", "2025-04-01", "2026-03-31", False),
+    ("2026-27", "2026-04-01", "2027-03-31", True),   # आज की तारीख (अगस्त 2026) इसी वित्तीय वर्ष में है
+]
+
+
+@app.route("/admin/import", methods=["GET"])
+@require_role("ADMIN")
+def import_home():
+    conn = db.get_db()
+    scheme_count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM schemes")["c"]
+    fy_count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM financial_years")["c"]
+    go_count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM go_register")["c"]
+    work_count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM works")["c"]
+    conn.close()
+    return render_template("admin_import.html", scheme_count=scheme_count, fy_count=fy_count,
+                            go_count=go_count, work_count=work_count)
+
+
+@app.route("/admin/import/seed-masters", methods=["POST"])
+@require_role("ADMIN")
+def import_seed_masters():
+    conn = db.get_db()
+    added_schemes = added_fy = 0
+    for code, name, category, interest_usable, non_tender_allowed in SEED_SCHEMES:
+        existing = db.fetchone(conn, "SELECT scheme_id FROM schemes WHERE scheme_code=?", (code,))
+        if not existing:
+            db.insert_and_get_id(conn, "schemes", "scheme_id",
+                ["scheme_code", "scheme_name", "scheme_category", "interest_usable", "non_tender_allowed"],
+                (code, name, category, interest_usable, non_tender_allowed))
+            added_schemes += 1
+    for fy_name, start_date, end_date, is_current in SEED_FY:
+        existing = db.fetchone(conn, "SELECT fy_id FROM financial_years WHERE fy_name=?", (fy_name,))
+        if not existing:
+            db.insert_and_get_id(conn, "financial_years", "fy_id",
+                ["fy_name", "start_date", "end_date", "is_current"],
+                (fy_name, start_date, end_date, is_current))
+            added_fy += 1
+    conn.close()
+    flash(f"Master seed पूर्ण — {added_schemes} नई योजना, {added_fy} नए वित्तीय वर्ष जोड़े गए (पहले से मौजूद को छोड़कर)।", "success")
+    return redirect(url_for("import_home"))
+
+
+def _find_or_create_firm(conn, firm_name):
+    firm_name = (firm_name or "").strip()
+    if not firm_name:
+        return None
+    existing = db.fetchone(conn, "SELECT firm_id FROM firms WHERE firm_name=?", (firm_name,))
+    if existing:
+        return existing["firm_id"]
+    return db.insert_and_get_id(conn, "firms", "firm_id", ["firm_name", "status"], (firm_name, "ACTIVE"))
+
+
+@app.route("/admin/import/go", methods=["POST"])
+@require_role("ADMIN")
+def import_go():
+    file = request.files.get("csv_file")
+    if not file or not file.filename:
+        flash("कृपया GO Master CSV फ़ाइल चुनें।", "error")
+        return redirect(url_for("import_home"))
+
+    stream = io.StringIO(file.stream.read().decode("utf-8-sig"))
+    reader = csv.DictReader(stream)
+    conn = db.get_db()
+    created, skipped_existing, errors = 0, 0, []
+
+    for i, row in enumerate(reader, start=2):  # पंक्ति 1 = header
+        try:
+            scheme = db.fetchone(conn, "SELECT scheme_id FROM schemes WHERE scheme_code=?", (row["scheme_code"].strip(),))
+            if not scheme:
+                errors.append(f"पंक्ति {i}: योजना कोड '{row['scheme_code']}' नहीं मिला — पहले 'Seed Schemes/FY' चलाएँ।")
+                continue
+            fy = db.fetchone(conn, "SELECT fy_id FROM financial_years WHERE fy_name=?", (row["fy_name"].strip(),))
+            if not fy:
+                errors.append(f"पंक्ति {i}: वित्तीय वर्ष '{row['fy_name']}' नहीं मिला।")
+                continue
+            existing_go = db.fetchone(conn, "SELECT go_id FROM go_register WHERE scheme_id=? AND go_number=?",
+                                       (scheme["scheme_id"], row["go_number"].strip()))
+            if existing_go:
+                skipped_existing += 1
+                continue
+            remarks = row.get("remarks", "")
+            if row.get("go_date_is_placeholder", "").strip().upper() == "YES":
+                remarks = (remarks + " | दिनांक अस्थायी (placeholder) है — असली शासनादेश दिनांक से पुष्टि करें।").strip(" |")
+            db.insert_and_get_id(conn, "go_register", "go_id",
+                ["scheme_id", "fy_id", "go_number", "go_date", "subject", "total_sanctioned_amount", "remarks", "created_by"],
+                (scheme["scheme_id"], fy["fy_id"], row["go_number"].strip(), row["go_date"].strip(),
+                 row.get("subject", ""), to_float(row["total_sanctioned_amount"]), remarks, session["user_id"]))
+            created += 1
+        except Exception as e:
+            errors.append(f"पंक्ति {i}: त्रुटि — {e}")
+
+    conn.close()
+    flash(f"GO Import पूर्ण — {created} नए GO बने, {skipped_existing} पहले से मौजूद (छोड़े गए), {len(errors)} त्रुटियाँ।",
+          "success" if not errors else "error")
+    for e in errors[:20]:
+        flash(e, "error")
+    return redirect(url_for("import_home"))
+
+
+@app.route("/admin/import/works", methods=["POST"])
+@require_role("ADMIN")
+def import_works():
+    file = request.files.get("csv_file")
+    if not file or not file.filename:
+        flash("कृपया Works CSV फ़ाइल चुनें।", "error")
+        return redirect(url_for("import_home"))
+
+    stream = io.StringIO(file.stream.read().decode("utf-8-sig"))
+    reader = csv.DictReader(stream)
+    conn = db.get_db()
+    created, skipped_existing, errors = 0, 0, []
+
+    for i, row in enumerate(reader, start=2):
+        try:
+            work_code = row["work_code"].strip()
+            existing_work = db.fetchone(conn, "SELECT work_id FROM works WHERE work_code=?", (work_code,))
+            if existing_work:
+                skipped_existing += 1
+                continue
+
+            scheme = db.fetchone(conn, "SELECT scheme_id FROM schemes WHERE scheme_code=?", (row["scheme_code"].strip(),))
+            if not scheme:
+                errors.append(f"पंक्ति {i} ({work_code}): योजना कोड '{row['scheme_code']}' नहीं मिला।")
+                continue
+            fy = db.fetchone(conn, "SELECT fy_id FROM financial_years WHERE fy_name=?", (row["fy_name"].strip(),))
+            if not fy:
+                errors.append(f"पंक्ति {i} ({work_code}): वित्तीय वर्ष '{row['fy_name']}' नहीं मिला।")
+                continue
+            go = db.fetchone(conn, "SELECT go_id FROM go_register WHERE scheme_id=? AND go_number=?",
+                              (scheme["scheme_id"], row["go_number"].strip()))
+            if not go:
+                errors.append(f"पंक्ति {i} ({work_code}): संबंधित GO '{row['go_number']}' नहीं मिला — पहले GO Import चलाएँ।")
+                continue
+
+            ward_id = None
+            if row.get("ward_no", "").strip():
+                ward = db.fetchone(conn, "SELECT ward_id FROM wards WHERE ward_no=?", (row["ward_no"].strip(),))
+                ward_id = ward["ward_id"] if ward else None
+
+            asset_type_id = None
+            if row.get("asset_type_name", "").strip():
+                at = db.fetchone(conn, "SELECT asset_type_id FROM asset_types WHERE asset_type_name=?",
+                                  (row["asset_type_name"].strip(),))
+                asset_type_id = at["asset_type_id"] if at else None
+
+            is_tendered = row.get("is_tendered", "TRUE").strip().upper() == "TRUE"
+
+            work_id = db.insert_and_get_id(conn, "works", "work_id",
+                ["work_code", "scheme_id", "ward_id", "fy_id", "asset_type_id", "work_name", "work_source",
+                 "is_tendered", "estimated_amount", "status", "proposed_date", "created_by", "go_id", "remarks"],
+                (work_code, scheme["scheme_id"], ward_id, fy["fy_id"], asset_type_id, row["work_name"],
+                 row.get("work_source", "LEGACY"), is_tendered, to_float(row["estimated_amount"]),
+                 row.get("status", "PROPOSED"), row["proposed_date"], session["user_id"], go["go_id"],
+                 row.get("remarks", "")))
+            created += 1
+
+            l1_amount_raw = row.get("l1_amount", "").strip()
+            if l1_amount_raw:
+                firm_id = _find_or_create_firm(conn, row.get("firm_name", ""))
+                tender_no = f"LEGACY-{work_code}"
+                remarks_t = "दिनांक/टेंडर-संख्या अस्थायी (placeholder) है — असली टेंडर अभिलेख से पुष्टि करें।"
+                db.insert_and_get_id(conn, "tenders", "tender_id",
+                    ["work_id", "tender_no", "tender_date", "tender_amount", "l1_firm_id", "l1_amount", "status",
+                     "remarks", "created_by"],
+                    (work_id, tender_no, row["proposed_date"], to_float(row["estimated_amount"]), firm_id,
+                     to_float(l1_amount_raw), "AWARDED", remarks_t, session["user_id"]))
+        except Exception as e:
+            errors.append(f"पंक्ति {i}: त्रुटि — {e}")
+
+    conn.commit()
+    conn.close()
+    flash(f"Works Import पूर्ण — {created} नए कार्य बने, {skipped_existing} पहले से मौजूद (छोड़े गए), {len(errors)} त्रुटियाँ।",
+          "success" if not errors else "error")
+    for e in errors[:20]:
+        flash(e, "error")
+    return redirect(url_for("import_home"))
+
+
+# #############################################################################
+# भाग B — Documents Module (GO/Estimate/Photo/Tender/Agreement/MB/Voucher)
+# #############################################################################
+
+DOC_CATEGORY_MAP = {
+    "GO": [
+        ("GO_ORDER", "शासनादेश (GO) स्कैन कॉपी"),
+    ],
+    "WORK": [
+        ("ESTIMATE", "प्राक्कलन (Estimate)"),
+        ("PHOTO_BEFORE", "फोटो - कार्य से पहले"),
+        ("PHOTO_PROGRESS", "फोटो - कार्य प्रगति के दौरान"),
+        ("PHOTO_AFTER", "फोटो - कार्य पूर्ण होने पर"),
+    ],
+    "TENDER": [
+        ("TENDER_NOTICE", "निविदा सूचना"),
+        ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),
+        ("WORK_ORDER", "कार्यादेश (Work Order)"),
+        ("AGREEMENT", "अनुबंध (Agreement)"),
+    ],
+    "BILL": [
+        ("MEASUREMENT_BOOK", "माप पुस्तिका (MB)"),
+        ("BILL_COPY", "बिल की प्रति"),
+    ],
+    "PAYMENT": [
+        ("VOUCHER", "भुगतान नोटिंग / वाउचर"),
+        ("PAYMENT_PROOF", "भुगतान प्रमाण (UTR/चेक स्कैन)"),
+    ],
+}
+
+
+@app.context_processor
+def inject_doc_categories():
+    return {"doc_categories": DOC_CATEGORY_MAP}
+
+
+@app.route("/documents/upload/<related_type>/<int:related_id>", methods=["POST"])
+@require_role("ADMIN", "EO_ADMIN", "ACCOUNTANT", "ACCOUNT_OPERATOR")
+def upload_document(related_type, related_id):
+    related_type = related_type.upper()
+    if related_type not in DOC_CATEGORY_MAP:
+        flash("अमान्य दस्तावेज़ श्रेणी", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    doc_category = request.form.get("doc_category")
+    valid_categories = [c[0] for c in DOC_CATEGORY_MAP[related_type]]
+    if doc_category not in valid_categories:
+        flash("अमान्य दस्तावेज़ प्रकार", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    file = request.files.get("file")
+    if not file or file.filename == "":
+        flash("कोई फ़ाइल नहीं चुनी गई", "warning")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in storage_r2.ALLOWED_EXTENSIONS:
+        flash("केवल PDF, JPG, PNG फ़ाइलें स्वीकार हैं", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > storage_r2.MAX_FILE_SIZE_BYTES:
+        flash("फ़ाइल 15 MB से बड़ी है", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    object_key = storage_r2.upload_file(file, related_type, related_id, doc_category)
+
+    conn = db.get_db()
+    db.insert_and_get_id(
+        conn, "documents", "document_id",
+        ["related_type", "related_id", "doc_category", "original_filename",
+         "object_key", "file_size_bytes", "uploaded_by"],
+        (related_type, related_id, doc_category, file.filename, object_key, size, session["user_id"]),
+    )
+    conn.commit()
+    conn.close()
+    flash("दस्तावेज़ सफलतापूर्वक अपलोड हुआ", "success")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.route("/documents/api/<related_type>/<int:related_id>")
+@require_role("ADMIN", "EO_ADMIN", "ACCOUNTANT", "ACCOUNT_OPERATOR")
+def api_list_documents(related_type, related_id):
+    related_type = related_type.upper()
+    conn = db.get_db()
+    docs = db.fetchall(
+        conn, "SELECT * FROM documents WHERE related_type=? AND related_id=? ORDER BY uploaded_at DESC",
+        (related_type, related_id),
+    )
+    conn.close()
+    label_map = dict(DOC_CATEGORY_MAP.get(related_type, []))
+    result = [{
+        "document_id": d["document_id"],
+        "doc_category": d["doc_category"],
+        "doc_category_label": label_map.get(d["doc_category"], d["doc_category"]),
+        "original_filename": d["original_filename"],
+        "uploaded_at": str(d["uploaded_at"]),
+    } for d in docs]
+    return jsonify(result)
+
+
+@app.route("/documents/<int:document_id>/download")
+@require_role("ADMIN", "EO_ADMIN", "ACCOUNTANT", "ACCOUNT_OPERATOR")
+def download_document(document_id):
+    conn = db.get_db()
+    doc = db.fetchone(conn, "SELECT * FROM documents WHERE document_id=?", (document_id,))
+    conn.close()
+    if not doc:
+        flash("दस्तावेज़ नहीं मिला", "danger")
+        return redirect(url_for("dashboard"))
+    url = storage_r2.get_download_url(doc["object_key"])
+    return redirect(url)
+
+
+@app.route("/documents/<int:document_id>/delete", methods=["POST"])
+@require_role("ADMIN")
+def delete_document(document_id):
+    conn = db.get_db()
+    doc = db.fetchone(conn, "SELECT * FROM documents WHERE document_id=?", (document_id,))
+    if not doc:
+        flash("दस्तावेज़ नहीं मिला", "danger")
+        return redirect(url_for("dashboard"))
+    storage_r2.delete_file(doc["object_key"])
+    db.run(conn, "DELETE FROM documents WHERE document_id=?", (document_id,))
+    conn.commit()
+    conn.close()
+    flash("दस्तावेज़ हटाया गया", "success")
+    return redirect(request.referrer or url_for("dashboard"))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
