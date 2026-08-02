@@ -1,0 +1,20 @@
+databases:
+  - name: rnms-db
+    plan: free
+    databaseName: rnms
+    user: rnms
+
+services:
+  - type: web
+    name: rnms-app
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rnms-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
