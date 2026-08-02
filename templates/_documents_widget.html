@@ -1,0 +1,84 @@
+{# =============================================================================
+   RNMS — templates/_documents_widget.html
+   इसे अपने repo के templates/ फ़ोल्डर में रखें, फ़ाइल का नाम बदलकर सिर्फ
+   "_documents_widget.html" कर दें (आगे "templates__" वाला हिस्सा हटा दें,
+   मैंने सिर्फ पैकेज में एक साथ रखने के लिए नाम में जोड़ा है)।
+
+   इस्तेमाल — जिस भी detail page में दस्तावेज़ दिखाने/अपलोड करने हों (जैसे
+   work_detail.html, go_detail.html, tender_detail.html, bill_detail.html),
+   वहां जिस जगह दस्तावेज़ सेक्शन दिखाना है, वहां यह दो लाइनें जोड़ें:
+
+     {% set doc_related_type = "WORK" %}
+     {% set doc_related_id = work.work_id %}
+     {% include "_documents_widget.html" %}
+
+   related_type अनुसार doc_related_id बदलें:
+     GO पेज पर       → doc_related_type = "GO",      doc_related_id = go.go_id
+     Work पेज पर     → doc_related_type = "WORK",    doc_related_id = work.work_id
+     Tender पेज पर   → doc_related_type = "TENDER",  doc_related_id = tender.tender_id
+     Bill पेज पर     → doc_related_type = "BILL",    doc_related_id = bill.bill_id
+     Payment पेज पर  → doc_related_type = "PAYMENT", doc_related_id = payment.payment_id
+
+   (अपने असली template में variable नाम "work"/"go"/"tender"/"bill"/"payment"
+   जैसा भी है, वैसा इस्तेमाल करें — जो नाम पहले से render_template() में भेजा
+   जा रहा है)
+============================================================================= #}
+<div class="card my-3">
+  <div class="card-header">संलग्न दस्तावेज़ (Documents)</div>
+  <div class="card-body">
+    <form class="row g-2 align-items-end mb-3" method="post"
+          action="{{ url_for('upload_document', related_type=doc_related_type, related_id=doc_related_id) }}"
+          enctype="multipart/form-data">
+      <div class="col-md-4">
+        <label class="form-label small">दस्तावेज़ प्रकार</label>
+        <select name="doc_category" class="form-select" required>
+          {% for cat_code, cat_label in doc_categories[doc_related_type] %}
+            <option value="{{ cat_code }}">{{ cat_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label small">फ़ाइल चुनें (PDF/JPG/PNG, अधिकतम 15MB)</label>
+        <input type="file" name="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">अपलोड करें</button>
+      </div>
+    </form>
+
+    <table class="table table-sm align-middle">
+      <thead><tr><th>प्रकार</th><th>फ़ाइल नाम</th><th>अपलोड तिथि</th><th></th></tr></thead>
+      <tbody id="documents-list-body-{{ doc_related_type }}-{{ doc_related_id }}">
+        <tr><td colspan="4" class="text-muted">लोड हो रहा है...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  var relatedType = {{ doc_related_type|tojson }};
+  var relatedId = {{ doc_related_id|tojson }};
+  var tbody = document.getElementById("documents-list-body-" + relatedType + "-" + relatedId);
+
+  fetch("/documents/api/" + relatedType + "/" + relatedId)
+    .then(function (r) { return r.json(); })
+    .then(function (docs) {
+      if (!docs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">कोई दस्तावेज़ अभी तक अपलोड नहीं हुआ</td></tr>';
+        return;
+      }
+      tbody.innerHTML = docs.map(function (d) {
+        return '<tr>' +
+          '<td>' + d.doc_category_label + '</td>' +
+          '<td>' + d.original_filename + '</td>' +
+          '<td>' + d.uploaded_at + '</td>' +
+          '<td><a class="btn btn-sm btn-outline-primary" href="/documents/' + d.document_id + '/download" target="_blank">देखें/डाउनलोड</a></td>' +
+          '</tr>';
+      }).join('');
+    })
+    .catch(function () {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-danger">दस्तावेज़ सूची लोड नहीं हो पाई</td></tr>';
+    });
+})();
+</script>
