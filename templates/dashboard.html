@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}डैशबोर्ड{% endblock %}
+{% block content %}
+<h4 class="mb-3">मदवार उपलब्ध धनराशि (Scheme Fund Summary)</h4>
+<div class="row g-3 mb-4">
+  {% for row in summary %}
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title">{{ row.scheme.scheme_name }}</h6>
+        <table class="table table-sm mb-0">
+          <tr><td>आरम्भिक शेष</td><td class="text-end">{{ row.opening|amt }}</td></tr>
+          <tr><td>प्राप्त किस्तें</td><td class="text-end">{{ row.installments|amt }}</td></tr>
+          <tr><td>उपयोग योग्य ब्याज</td><td class="text-end">{{ row.interest|amt }}</td></tr>
+          <tr><td>कुल व्यय</td><td class="text-end">− {{ row.expenditure|amt }}</td></tr>
+          <tr><td>बैंक चार्ज</td><td class="text-end">− {{ row.charges|amt }}</td></tr>
+          <tr><td>वापसी</td><td class="text-end">+ {{ row.refunds|amt }}</td></tr>
+          <tr class="fw-bold border-top"><td>उपलब्ध अवशेष</td><td class="text-end">{{ row.available|amt }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="alert alert-warning">अभी कोई मद सक्रिय नहीं है — Masters से मद जोड़ें।</div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm"><div class="card-body"><h3>{{ works_count }}</h3><small class="text-muted">कुल कार्य</small></div></div>
+  </div>
+  {% if pending_counts %}
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm border-warning"><div class="card-body"><h3>{{ pending_counts.verify }}</h3><small class="text-muted">सत्यापन हेतु लंबित</small></div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm border-warning"><div class="card-body"><h3>{{ pending_counts.approve }}</h3><small class="text-muted">EO अनुमोदन हेतु लंबित</small></div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm border-warning"><div class="card-body"><h3>{{ pending_counts.post }}</h3><small class="text-muted">Posting हेतु लंबित</small></div></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

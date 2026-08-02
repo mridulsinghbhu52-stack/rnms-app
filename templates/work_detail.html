@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ work.work_code }}{% endblock %}
+{% block content %}
+<h4 class="mb-1">{{ work.work_code }} — {{ work.work_name }}</h4>
+<p class="text-muted">मद: {{ work.scheme_name }} | अनुमानित राशि: {{ work.estimated_amount|amt }} | स्थिति: <span class="badge bg-secondary">{{ work.status }}</span> | अब तक भुगतान: {{ total_paid|amt }}</p>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">टेंडर रजिस्टर</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_tender', work_id=work.work_id) }}" class="row g-2 mb-3">
+          <div class="col-6"><input name="tender_no" class="form-control form-control-sm" placeholder="टेंडर नं." required></div>
+          <div class="col-6"><input type="date" name="tender_date" class="form-control form-control-sm" required></div>
+          <div class="col-6"><input name="tender_amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="टेंडर राशि" required></div>
+          <div class="col-6"><input name="l1_amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="L1 राशि"></div>
+          <div class="col-8"><select name="l1_firm_id" class="form-select form-select-sm">
+            <option value="">L1 फर्म</option>{% for f in firms %}<option value="{{ f.firm_id }}">{{ f.firm_name }}</option>{% endfor %}
+          </select></div>
+          <div class="col-4"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">दर्ज करें</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>नं.</th><th>राशि</th><th>L1 राशि</th></tr></thead><tbody>
+          {% for t in tenders %}<tr><td>{{ t.tender_no }}</td><td>{{ t.tender_amount|amt }}</td><td>{{ t.l1_amount|amt if t.l1_amount else '—' }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">Work Order</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_work_order', work_id=work.work_id) }}" class="row g-2 mb-3">
+          <div class="col-6"><input name="wo_number" class="form-control form-control-sm" placeholder="WO नं." required></div>
+          <div class="col-6"><input type="date" name="wo_date" class="form-control form-control-sm" required></div>
+          <div class="col-6"><select name="firm_id" class="form-select form-select-sm" required>
+            <option value="">फर्म</option>{% for f in firms %}<option value="{{ f.firm_id }}">{{ f.firm_name }}</option>{% endfor %}
+          </select></div>
+          <div class="col-6"><input name="wo_amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="WO राशि" required></div>
+          <input type="hidden" name="tender_id" value="{{ latest_tender.tender_id if latest_tender else '' }}">
+          <div class="col-12"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">दर्ज करें</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>WO नं.</th><th>फर्म</th><th>राशि</th></tr></thead><tbody>
+          {% for wo in work_orders %}<tr><td>{{ wo.wo_number }}</td><td>{{ wo.firm_name }}</td><td>{{ wo.wo_amount|amt }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header">बिल एवं भुगतान</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_bill', work_id=work.work_id) }}" class="row g-2 mb-3">
+          <div class="col-md-2"><select name="firm_id" class="form-select form-select-sm" required>
+            <option value="">फर्म</option>{% for f in firms %}<option value="{{ f.firm_id }}">{{ f.firm_name }}</option>{% endfor %}
+          </select></div>
+          <div class="col-md-2"><input name="bill_no" class="form-control form-control-sm" placeholder="बिल नं." required></div>
+          <div class="col-md-2"><input type="date" name="bill_date" class="form-control form-control-sm" required></div>
+          <div class="col-md-2"><input name="amount_excl_gst" type="number" step="0.01" class="form-control form-control-sm" placeholder="बिल राशि (GST रहित)" required></div>
+          <div class="col-md-2"><select name="gst_rate" class="form-select form-select-sm">
+            <option value="0">GST 0%</option><option value="12">GST 12%</option><option value="18">GST 18%</option><option value="27">GST 27%</option>
+          </select></div>
+          <div class="col-md-2"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">बिल दर्ज करें</button></div>
+        </form>
+        <table class="table table-sm">
+          <thead><tr><th>#</th><th>बिल नं.</th><th>फर्म</th><th>राशि (GST सहित)</th><th>स्थिति</th><th>भुगतान</th></tr></thead>
+          <tbody>
+          {% for b in bills %}
+          <tr>
+            <td>{{ b.bill_sequence_no }}</td><td>{{ b.bill_no }}</td><td>{{ b.firm_name }}</td>
+            <td>{{ b.amount_incl_gst|amt }}</td><td><span class="badge bg-secondary">{{ b.status }}</span></td>
+            <td>
+              {% if b.status == 'SUBMITTED' %}
+              <form method="POST" action="{{ url_for('new_payment', bill_id=b.bill_id) }}" class="d-flex gap-1 flex-wrap align-items-center">
+                <input name="ppa_no" class="form-control form-control-sm" placeholder="PPA नं." style="width:90px">
+                <input type="date" name="ppa_date" class="form-control form-control-sm" style="width:130px">
+                <span class="form-check form-check-inline small"><input type="checkbox" name="include_labour_cess" class="form-check-input">Labour Cess</span>
+                <span class="form-check form-check-inline small"><input type="checkbox" name="no_deduction" class="form-check-input">बिना कटौती</span>
+                <button class="btn btn-sm btn-outline-success">भुगतान बनाएं</button>
+              </form>
+              {% else %}<span class="text-muted small">{{ b.status }}</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        <h6 class="mt-3">भुगतान इतिहास</h6>
+        <table class="table table-sm">
+          <thead><tr><th>बिल</th><th>Gross</th><th>कटौती</th><th>Net</th><th>स्थिति</th></tr></thead>
+          <tbody>
+          {% for p in payments %}
+          <tr><td>{{ p.bill_no }}</td><td>{{ p.gross_amount|amt }}</td><td>{{ p.total_deduction|amt }}</td><td>{{ p.net_payment|amt }}</td><td><span class="badge bg-info text-dark">{{ p.status }}</span></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

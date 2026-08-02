@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}कैशबुक{% endblock %}
+{% block content %}
+<h4 class="mb-3">कैशबुक (Auto-generated)</h4>
+
+<form method="GET" class="row g-2 mb-3">
+  <div class="col-md-3">
+    <select name="scheme_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">सभी मद</option>
+      {% for s in schemes %}<option value="{{ s.scheme_id }}" {{ 'selected' if selected_scheme|string == s.scheme_id|string else '' }}>{{ s.scheme_name }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+<table class="table table-sm bg-white shadow-sm">
+  <thead><tr><th>दिनांक</th><th>मद</th><th>खाता</th><th>विवरण</th><th class="text-end">प्राप्ति</th><th class="text-end">भुगतान</th><th class="text-end">Running Balance</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+  <tr>
+    <td>{{ e.entry_date }}</td><td>{{ e.scheme_name }}</td><td>{{ e.account_no }}</td><td>{{ e.particulars }}</td>
+    <td class="text-end">{{ e.receipt_amount|amt if e.receipt_amount and e.receipt_amount|float > 0 else '' }}</td>
+    <td class="text-end">{{ e.payment_amount|amt if e.payment_amount and e.payment_amount|float > 0 else '' }}</td>
+    <td class="text-end fw-bold">{{ e.running_balance|amt }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="text-center text-muted">अभी कोई प्रविष्टि नहीं है।</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
