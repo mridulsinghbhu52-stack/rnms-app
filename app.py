@@ -207,7 +207,7 @@ def post_cashbook_entry(conn, bank_account_id, scheme_id, entry_date, particular
 
 def primary_bank_account(conn, scheme_id):
     row = db.fetchone(conn, """SELECT account_id FROM bank_accounts
-                                WHERE scheme_id=? AND (is_active=1 OR is_active=TRUE)
+                                WHERE scheme_id=? AND (is_active=TRUE OR is_active=TRUE)
                                 ORDER BY account_id LIMIT 1""", (scheme_id,))
     return row["account_id"] if row else None
 
@@ -221,7 +221,7 @@ def primary_bank_account(conn, scheme_id):
 def finance():
     conn = db.get_db()
     data = {
-        "schemes": db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=1 OR is_active=TRUE ORDER BY scheme_name"),
+        "schemes": db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=TRUE OR is_active=TRUE ORDER BY scheme_name"),
         "fys": db.fetchall(conn, "SELECT * FROM financial_years ORDER BY fy_id DESC"),
         "bank_accounts": db.fetchall(conn, "SELECT * FROM bank_accounts ORDER BY account_id DESC"),
         "opening_balances": db.fetchall(conn, """SELECT ob.*, s.scheme_name, f.fy_name FROM opening_balances ob
@@ -362,7 +362,7 @@ def works_list():
                                   JOIN schemes s ON s.scheme_id=w.scheme_id
                                   LEFT JOIN wards wd ON wd.ward_id=w.ward_id
                                   ORDER BY w.work_id DESC""")
-    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=1 OR is_active=TRUE ORDER BY scheme_name")
+    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=TRUE OR is_active=TRUE ORDER BY scheme_name")
     wards = db.fetchall(conn, "SELECT * FROM wards ORDER BY ward_no")
     fys = db.fetchall(conn, "SELECT * FROM financial_years ORDER BY fy_id DESC")
     asset_types = db.fetchall(conn, "SELECT * FROM asset_types ORDER BY asset_type_name")
