@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Masters{% endblock %}
+{% block content %}
+<h4 class="mb-3">Masters — मास्टर डेटा</h4>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">योजना/मद (Schemes)</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_scheme') }}" class="row g-2 mb-3">
+          <div class="col-4"><input name="scheme_code" class="form-control form-control-sm" placeholder="कोड" required></div>
+          <div class="col-8"><input name="scheme_name" class="form-control form-control-sm" placeholder="मद का नाम" required></div>
+          <div class="col-6">
+            <select name="scheme_category" class="form-select form-select-sm" required>
+              <option value="STATE_FINANCE">राज्य वित्त आयोग</option>
+              <option value="CENTRAL_FINANCE_TIED">केन्द्रीय वित्त — Tied</option>
+              <option value="CENTRAL_FINANCE_UNTIED">केन्द्रीय वित्त — Untied</option>
+              <option value="BODY_FUND">निकाय निधि</option>
+              <option value="OTHER">अन्य</option>
+            </select>
+          </div>
+          <div class="col-3 form-check mt-2"><input type="checkbox" name="interest_usable" class="form-check-input"><label class="form-check-label small">ब्याज उपयोग योग्य</label></div>
+          <div class="col-3 form-check mt-2"><input type="checkbox" name="non_tender_allowed" class="form-check-input"><label class="form-check-label small">बिना टेंडर अनुमन्य</label></div>
+          <div class="col-12"><button class="btn btn-sm text-white" style="background:#2f6f4f;">जोड़ें</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>कोड</th><th>नाम</th><th>श्रेणी</th></tr></thead><tbody>
+          {% for s in schemes %}<tr><td>{{ s.scheme_code }}</td><td>{{ s.scheme_name }}</td><td>{{ s.scheme_category }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">वार्ड (Wards)</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_ward') }}" class="row g-2 mb-3">
+          <div class="col-4"><input name="ward_no" class="form-control form-control-sm" placeholder="वार्ड नं." required></div>
+          <div class="col-6"><input name="ward_name" class="form-control form-control-sm" placeholder="वार्ड नाम"></div>
+          <div class="col-2"><button class="btn btn-sm text-white" style="background:#2f6f4f;">+</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>नं.</th><th>नाम</th></tr></thead><tbody>
+          {% for w in wards %}<tr><td>{{ w.ward_no }}</td><td>{{ w.ward_name }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">वित्तीय वर्ष (Financial Years)</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_fy') }}" class="row g-2 mb-3">
+          <div class="col-3"><input name="fy_name" class="form-control form-control-sm" placeholder="2025-26" required></div>
+          <div class="col-3"><input type="date" name="start_date" class="form-control form-control-sm" required></div>
+          <div class="col-3"><input type="date" name="end_date" class="form-control form-control-sm" required></div>
+          <div class="col-2 form-check mt-2"><input type="checkbox" name="is_current" class="form-check-input"><label class="form-check-label small">चालू</label></div>
+          <div class="col-1"><button class="btn btn-sm text-white" style="background:#2f6f4f;">+</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>वर्ष</th><th>से</th><th>तक</th><th>चालू</th></tr></thead><tbody>
+          {% for f in fys %}<tr><td>{{ f.fy_name }}</td><td>{{ f.start_date }}</td><td>{{ f.end_date }}</td><td>{{ '✓' if f.is_current in (1, True) else '' }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">परिसंपत्ति प्रकार (Asset Types)</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_asset_type') }}" class="row g-2 mb-3">
+          <div class="col-9"><input name="asset_type_name" class="form-control form-control-sm" placeholder="जैसे सड़क, नाली" required></div>
+          <div class="col-3"><button class="btn btn-sm text-white" style="background:#2f6f4f;">+</button></div>
+        </form>
+        <table class="table table-sm"><tbody>
+          {% for a in asset_types %}<tr><td>{{ a.asset_type_name }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">ठेकेदार/Firm Master</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_firm') }}" class="row g-2 mb-3">
+          <div class="col-6"><input name="firm_name" class="form-control form-control-sm" placeholder="फर्म नाम" required></div>
+          <div class="col-6"><input name="proprietor_name" class="form-control form-control-sm" placeholder="प्रोपराइटर"></div>
+          <div class="col-4"><input name="gst_no" class="form-control form-control-sm" placeholder="GST नं."></div>
+          <div class="col-4"><input name="pan_no" class="form-control form-control-sm" placeholder="PAN नं."></div>
+          <div class="col-4"><input name="contact_no" class="form-control form-control-sm" placeholder="मोबाइल"></div>
+          <div class="col-12"><button class="btn btn-sm text-white" style="background:#2f6f4f;">जोड़ें</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>फर्म</th><th>GST</th><th>स्थिति</th></tr></thead><tbody>
+          {% for f in firms %}<tr><td>{{ f.firm_name }}</td><td>{{ f.gst_no }}</td><td>{{ f.status }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header">बैंक खाते (Bank Accounts)</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('new_bank_account') }}" class="row g-2 mb-3">
+          <div class="col-6"><input name="account_no" class="form-control form-control-sm" placeholder="खाता संख्या" required></div>
+          <div class="col-6"><input name="bank_name" class="form-control form-control-sm" placeholder="बैंक नाम" required></div>
+          <div class="col-6"><input name="ifsc_code" class="form-control form-control-sm" placeholder="IFSC"></div>
+          <div class="col-6">
+            <select name="scheme_id" class="form-select form-select-sm">
+              <option value="">— साझा/सामान्य खाता —</option>
+              {% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12"><button class="btn btn-sm text-white" style="background:#2f6f4f;">जोड़ें</button></div>
+        </form>
+        <table class="table table-sm"><thead><tr><th>खाता</th><th>बैंक</th><th>मद</th></tr></thead><tbody>
+          {% for b in bank_accounts %}<tr><td>{{ b.account_no }}</td><td>{{ b.bank_name }}</td><td>{{ b.scheme_name or '—' }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
