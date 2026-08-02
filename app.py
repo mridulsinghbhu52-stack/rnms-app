@@ -65,12 +65,12 @@ def logout():
 @login_required
 def dashboard():
     conn = db.get_db()
-    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active = 1 OR is_active = TRUE ORDER BY scheme_name")
+    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active = TRUE ORDER BY scheme_name")
     summary = []
     for s in schemes:
         opening = db.fetchone(conn, "SELECT COALESCE(SUM(amount),0) AS v FROM opening_balances WHERE scheme_id=?", (s["scheme_id"],))["v"]
         installments = db.fetchone(conn, "SELECT COALESCE(SUM(amount_received),0) AS v FROM installments WHERE scheme_id=?", (s["scheme_id"],))["v"]
-        interest = db.fetchone(conn, "SELECT COALESCE(SUM(amount),0) AS v FROM bank_interest WHERE scheme_id=? AND (is_usable=1 OR is_usable=TRUE)", (s["scheme_id"],))["v"]
+        interest = db.fetchone(conn, "SELECT COALESCE(SUM(amount),0) AS v FROM bank_interest WHERE scheme_id=? AND (is_usable=TRUE)", (s["scheme_id"],))["v"]
         expenditure = db.fetchone(conn, """SELECT COALESCE(SUM(p.net_payment),0) AS v FROM payments p
                                             JOIN works w ON w.work_id = p.work_id
                                             WHERE w.scheme_id=? AND p.status='POSTED'""", (s["scheme_id"],))["v"]
