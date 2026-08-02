@@ -1,0 +1,57 @@
+{# =============================================================================
+   RNMS — templates/admin_import.html
+   इसे अपने repo के templates/ फ़ोल्डर में इसी नाम से रखें।
+   मान लिया गया है कि आपकी अन्य templates की तरह यह भी base.html से extend
+   होती है और content block का नाम "content" है — अगर आपकी अन्य templates में
+   अलग block नाम है (जैसे "body") तो नीचे की पहली दो लाइनें उसी अनुसार बदल दें।
+============================================================================= #}
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="mb-3">Legacy Data Import — पुराना डेटा आयात</h2>
+  <p class="text-muted">यह पेज केवल Admin के लिए है। तीन चरणों में क्रम से चलाएँ — पहले Seed, फिर GO Import, फिर Works Import।</p>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card text-center p-3"><div class="fs-4">{{ scheme_count }}</div><div class="text-muted small">योजना (Schemes)</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="fs-4">{{ fy_count }}</div><div class="text-muted small">वित्तीय वर्ष</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="fs-4">{{ go_count }}</div><div class="text-muted small">GO (कुल)</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="fs-4">{{ work_count }}</div><div class="text-muted small">कार्य (कुल)</div></div></div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">चरण 1 — योजना एवं वित्तीय वर्ष Seed करें</div>
+    <div class="card-body">
+      <p>यह 11 मानक योजनाएँ (CMNSY, CMVNY, आकांक्षी, आदर्श आदि) और 2022-23 से 2026-27 तक के वित्तीय वर्ष जोड़ देगा — जो पहले से मौजूद हैं उन्हें दोबारा नहीं बनाएगा (दोबारा क्लिक करना सुरक्षित है)।</p>
+      <form method="post" action="{{ url_for('import_seed_masters') }}">
+        <button type="submit" class="btn btn-primary">योजना + वित्तीय वर्ष Seed करें</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">चरण 2 — GO Master CSV Import (go_master_import.csv)</div>
+    <div class="card-body">
+      <p>go_master_import.csv फ़ाइल चुनें। GO दिनांक अभी अस्थायी (वित्तीय वर्ष के 1 अप्रैल) रखे गए हैं — असली शासनादेश दिनांक बाद में हर GO खोलकर सुधार लें।</p>
+      <form method="post" action="{{ url_for('import_go') }}" enctype="multipart/form-data" class="d-flex gap-2">
+        <input type="file" name="csv_file" accept=".csv" class="form-control" required>
+        <button type="submit" class="btn btn-primary text-nowrap">GO Import चलाएँ</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">चरण 3 — Works CSV Import (works_import.csv)</div>
+    <div class="card-body">
+      <p>works_import.csv फ़ाइल चुनें (चरण 2 पूरा होने के बाद ही चलाएँ, क्योंकि हर कार्य को उसके GO से जोड़ा जाएगा)। जिन कार्यों में L1 राशि है, उनके लिए एक अस्थायी Tender No. (LEGACY-...) भी बन जाएगा — असली टेंडर संख्या बाद में सुधार लें।</p>
+      <form method="post" action="{{ url_for('import_works') }}" enctype="multipart/form-data" class="d-flex gap-2">
+        <input type="file" name="csv_file" accept=".csv" class="form-control" required>
+        <button type="submit" class="btn btn-primary text-nowrap">Works Import चलाएँ</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="alert alert-warning">
+    ध्यान दें: Import के बाद हर GO और हर टेंडर में जो जानकारी "अस्थायी (placeholder)" के रूप में चिह्नित है (remarks कॉलम में लिखा मिलेगा), उसे असली अभिलेख से मिलाकर यथाशीघ्र अद्यतन करें — विशेषकर GO दिनांक और टेंडर संख्या।
+  </div>
+</div>
+{% endblock %}
