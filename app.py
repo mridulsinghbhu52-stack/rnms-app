@@ -1016,6 +1016,107 @@ def delete_document(document_id):
     flash("दस्तावेज़ हटाया गया", "success")
     return redirect(request.referrer or url_for("dashboard"))
 
+# =============================================================================
+# चरण B — app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
+# यह Voucher Print + Tax Remittance (GST/आयकर/Labour Cess जमा ट्रैकिंग) का पूरा कोड है।
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Payment Voucher Print
+# -----------------------------------------------------------------------------
+
+@app.route("/payments/<int:payment_id>/voucher")
+@login_required
+def payment_voucher(payment_id):
+    conn = db.get_db()
+    payment = db.fetchone(conn, """SELECT p.*, w.work_code, w.work_name, s.scheme_name,
+                                    b.bill_no, b.bill_date, f.firm_name, f.pan_no, f.gst_no,
+                                    f.bank_account_no, f.bank_ifsc, f.bank_name
+                             FROM payments p
+                             JOIN works w ON w.work_id=p.work_id
+                             JOIN schemes s ON s.scheme_id=w.scheme_id
+                             JOIN bills b ON b.bill_id=p.bill_id
+                             JOIN firms f ON f.firm_id=b.firm_id
+                             WHERE p.payment_id=?""", (payment_id,))
+    conn.close()
+    if not payment:
+        flash("भुगतान नहीं मिला", "error")
+        return redirect(url_for("payments_queue"))
+    return render_template("payment_voucher.html", payment=payment)
+
+
+# -----------------------------------------------------------------------------
+# Tax Remittance Reconciliation — GST / आयकर / Labour Cess सरकार को जमा ट्रैकिंग
+# (महीने-वार consolidated — जैसा आपने बताया)
+# -----------------------------------------------------------------------------
+
+def _month_range(period_month):
+    y, m = map(int, period_month.split("-"))
+    start = f"{y:04d}-{m:02d}-01"
+    if m == 12:
+        end = f"{y+1:04d}-01-01"
+    else:
+        end = f"{y:04d}-{m+1:02d}-01"
+    return start, end
+
+TAX_TYPE_COL = {"GST": "gst_remittance_id", "INCOME_TAX": "income_tax_remittance_id", "LABOUR_CESS": "labour_cess_remittance_id"}
+TAX_TYPE_AMOUNT_EXPR = {"GST": "(p.cgst_1pct + p.sgst_1pct)", "INCOME_TAX": "p.income_tax_2pct", "LABOUR_CESS": "p.labour_cess_1pct"}
+TAX_TYPE_LABELS = [("GST", "GST (CGST+SGST)"), ("INCOME_TAX", "आयकर (TDS)"), ("LABOUR_CESS", "Labour Cess")]
+
+
+@app.route("/tax-remittance")
+@require_role("ACCOUNTANT", "ADMIN")
+def tax_remittance_home():
+    conn = db.get_db()
+    period_month = request.args.get("period_month") or today()[:7]
+    tax_type = request.args.get("tax_type") or "GST"
+    col = TAX_TYPE_COL.get(tax_type, "gst_remittance_id")
+    amt = TAX_TYPE_AMOUNT_EXPR.get(tax_type, "(p.cgst_1pct + p.sgst_1pct)")
+    start, end = _month_range(period_month)
+    payments = db.fetchall(conn, f"""SELECT p.payment_id, p.status, p.posted_at, {amt} AS tax_amount, p.{col} AS remittance_id,
+                                    w.work_code, b.bill_no, f.firm_name, f.pan_no
+                             FROM payments p
+                             JOIN works w ON w.work_id=p.work_id
+                             JOIN bills b ON b.bill_id=p.bill_id
+                             JOIN firms f ON f.firm_id=b.firm_id
+                             WHERE p.status='POSTED' AND p.posted_at>=? AND p.posted_at<?
+                             ORDER BY p.posted_at""", (start, end))
+    remittances = db.fetchall(conn, "SELECT * FROM tax_remittances WHERE tax_type=? AND period_month=? ORDER BY remittance_id DESC",
+                               (tax_type, period_month))
+    conn.close()
+    return render_template("tax_remittance.html", payments=payments, remittances=remittances,
+                            period_month=period_month, tax_type=tax_type, tax_types=TAX_TYPE_LABELS)
+
+
+@app.route("/tax-remittance/create", methods=["POST"])
+@require_role("ACCOUNTANT", "ADMIN")
+def create_tax_remittance():
+    conn = db.get_db()
+    tax_type = request.form.get("tax_type")
+    period_month = request.form.get("period_month")
+    cheque_number = request.form.get("cheque_number", "").strip()
+    remittance_date = request.form.get("remittance_date")
+    remarks = request.form.get("remarks", "")
+    payment_ids = request.form.getlist("payment_ids")
+    col = TAX_TYPE_COL.get(tax_type)
+    amt_expr = {"GST": "(cgst_1pct + sgst_1pct)", "INCOME_TAX": "income_tax_2pct", "LABOUR_CESS": "labour_cess_1pct"}.get(tax_type)
+    if not col or not payment_ids:
+        conn.close()
+        flash("कृपया कम से कम एक भुगतान चुनें।", "error")
+        return redirect(url_for("tax_remittance_home", period_month=period_month, tax_type=tax_type))
+    total = 0.0
+    for pid in payment_ids:
+        row = db.fetchone(conn, f"SELECT {amt_expr} AS amt FROM payments WHERE payment_id=?", (pid,))
+        total += float(row["amt"]) if row and row["amt"] else 0.0
+    remittance_id = db.insert_and_get_id(conn, "tax_remittances", "remittance_id",
+        ["tax_type", "period_month", "total_amount", "cheque_number", "remittance_date", "remarks", "created_by"],
+        (tax_type, period_month, round(total, 2), cheque_number, remittance_date, remarks, session["user_id"]))
+    for pid in payment_ids:
+        db.run(conn, f"UPDATE payments SET {col}=? WHERE payment_id=?", (remittance_id, pid))
+    conn.commit()
+    conn.close()
+    flash(f"जमा रिकॉर्ड बना — {len(payment_ids)} भुगतान जोड़े गए, कुल राशि {round(total,2)}", "success")
+    return redirect(url_for("tax_remittance_home", period_month=period_month, tax_type=tax_type))
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
