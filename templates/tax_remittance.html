@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}टैक्स जमा सुलह{% endblock %}
+{% block content %}
+<div class="container my-4">
+  <h4 class="mb-3">टैक्स जमा सुलह (Tax Remittance Reconciliation)</h4>
+
+  <form method="GET" class="row g-2 mb-4 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small">टैक्स प्रकार</label>
+      <select name="tax_type" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for code, label in tax_types %}
+        <option value="{{ code }}" {% if code == tax_type %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">महीना</label>
+      <input type="month" name="period_month" value="{{ period_month }}" class="form-control form-control-sm" onchange="this.form.submit()">
+    </div>
+  </form>
+
+  <div class="card mb-4">
+    <div class="card-header">इस महीने के अभी तक बने जमा-रिकॉर्ड</div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>#</th><th>कुल राशि</th><th>चेक नंबर</th><th>जमा दिनांक</th><th>टिप्पणी</th></tr></thead>
+        <tbody>
+          {% for r in remittances %}
+          <tr><td>{{ r.remittance_id }}</td><td>{{ r.total_amount|amt }}</td><td>{{ r.cheque_number or '—' }}</td><td>{{ r.remittance_date }}</td><td>{{ r.remarks or '' }}</td></tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted">इस महीने अभी कोई जमा-रिकॉर्ड नहीं बना।</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('create_tax_remittance') }}">
+    <input type="hidden" name="tax_type" value="{{ tax_type }}">
+    <input type="hidden" name="period_month" value="{{ period_month }}">
+
+    <div class="card mb-3">
+      <div class="card-header">नया जमा-रिकॉर्ड बनाएं</div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3"><input name="cheque_number" class="form-control form-control-sm" placeholder="चेक/चालान नंबर" required></div>
+          <div class="col-md-3"><input type="date" name="remittance_date" class="form-control form-control-sm" required></div>
+          <div class="col-md-6"><input name="remarks" class="form-control form-control-sm" placeholder="टिप्पणी (वैकल्पिक)"></div>
+        </div>
+
+        <table class="table table-sm">
+          <thead><tr><th></th><th>कार्य</th><th>बिल</th><th>फर्म</th><th>PAN</th><th class="text-end">कर राशि (₹)</th><th>स्थिति</th></tr></thead>
+          <tbody>
+            {% for p in payments %}
+            <tr>
+              <td>
+                {% if not p.remittance_id %}
+                <input type="checkbox" name="payment_ids" value="{{ p.payment_id }}">
+                {% endif %}
+              </td>
+              <td>{{ p.work_code }}</td>
+              <td>{{ p.bill_no }}</td>
+              <td>{{ p.firm_name }}</td>
+              <td>{{ p.pan_no or '—' }}</td>
+              <td class="text-end">{{ p.tax_amount|amt }}</td>
+              <td>
+                {% if p.remittance_id %}
+                <span class="badge bg-success">जमा हो चुका (#{{ p.remittance_id }})</span>
+                {% else %}
+                <span class="badge bg-warning text-dark">लंबित</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted">इस महीने कोई Posted भुगतान नहीं मिला।</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button class="btn btn-sm btn-success">चुने हुए भुगतानों को जमा-रिकॉर्ड में जोड़ें</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
