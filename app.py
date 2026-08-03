@@ -574,21 +574,23 @@ def post_payment(payment_id):
     bank_account_id = primary_bank_account(conn, work["scheme_id"])
     if not bank_account_id:
         conn.close()
-        flash("इस मद हेतु कोई बैंक खाता सेट नहीं है — पहले Masters में बैंक खाता जोड़ें।", "error")
+        flash("इस मद हेतु कोई बैंक खाता सेट नहीं है – पहले Masters में बैंक खाता जोड़ें।", "error")
         return redirect(url_for("payments_queue"))
-    db.run(conn, "UPDATE payments SET status='POSTED', posted_by=?, posted_at=? WHERE payment_id=?",
-           (session["user_id"], datetime.now().isoformat(), payment_id))
+    cheque_number = request.form.get("cheque_number", "").strip()
+    db.run(conn, "UPDATE payments SET status='POSTED', posted_by=?, posted_at=?, cheque_number=? WHERE payment_id=?",
+           (session["user_id"], datetime.now().isoformat(), cheque_number, payment_id))
     db.insert_and_get_id(conn, "payment_approval_log", "log_id",
         ["payment_id", "action", "actor_user_id", "remarks"], (payment_id, "POST", session["user_id"], request.form.get("remarks")))
     post_cashbook_entry(conn, bank_account_id, work["scheme_id"], today(),
-                         f"भुगतान — {work['work_code']} / बिल {bill['bill_no']}",
+                         f"भुगतान – {work['work_code']} / बिल {bill['bill_no']}",
                          payment=float(payment["net_payment"]), reference_type="PAYMENT",
                          reference_id=payment_id, created_by=session["user_id"])
     db.run(conn, "UPDATE bills SET status='PAID' WHERE bill_id=?", (payment["bill_id"],))
     conn.commit()
     conn.close()
-    flash("भुगतान Post हुआ एवं कैशबुक में दर्ज हुआ।", "success")
+    flash("भुगतान Post हुआ एवं कैशबुक में दर्ज हुआ!", "success")
     return redirect(url_for("payments_queue"))
+
 
 
 # ---------------------------------------------------------------------------
