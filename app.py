@@ -894,7 +894,9 @@ DOC_CATEGORY_MAP = {
         ("AGREEMENT", "अनुबंध (Agreement)"),
     ],
     "BILL": [
-        ("MEASUREMENT_BOOK", "माप पुस्तिका (MB)"),
+    ("MEASUREMENT_BOOK", "माप पुस्तिका (MB)"),
+     ("INSPECTION_REPORT", "जांच रिपोर्ट"),
+     ("TEST_REPORT", "टेस्ट रिपोर्ट"),
         ("BILL_COPY", "बिल की प्रति"),
     ],
     "PAYMENT": [
@@ -976,6 +978,14 @@ def api_list_documents(related_type, related_id):
     return jsonify(result)
 
 
+@app.route("/documents/manage/<related_type>/<int:related_id>")
+@require_role("ADMIN", "EO_ADMIN", "ACCOUNTANT", "ACCOUNT_OPERATOR")
+def manage_documents(related_type, related_id):
+    related_type = related_type.upper()
+    if related_type not in DOC_CATEGORY_MAP:
+        flash("अमान्य दस्तावेज़ श्रेणी", "danger")
+        return redirect(url_for("dashboard"))
+    return render_template("documents_manage.html", related_type=related_type, related_id=related_id)  
 @app.route("/documents/<int:document_id>/download")
 @require_role("ADMIN", "EO_ADMIN", "ACCOUNTANT", "ACCOUNT_OPERATOR")
 def download_document(document_id):
