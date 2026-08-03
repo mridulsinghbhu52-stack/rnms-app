@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary mb-3">← वापस जाएं</a>
+  {% set doc_related_type = related_type %}
+  {% set doc_related_id = related_id %}
+  {% include "_documents_widget.html" %}
+</div>
+{% endblock %}
