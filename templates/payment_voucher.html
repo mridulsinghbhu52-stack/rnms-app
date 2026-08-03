@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}भुगतान वाउचर{% endblock %}
+{% block content %}
+<div class="container my-4" style="max-width:700px;">
+  <div class="d-flex justify-content-between mb-3 d-print-none">
+    <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">← वापस जाएं</a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+  </div>
+
+  <div class="border p-4">
+    <h5 class="text-center mb-1">नगर पंचायत रतसर कलां, बलिया</h5>
+    <h6 class="text-center mb-4">भुगतान वाउचर (Payment Voucher)</h6>
+
+    <table class="table table-sm table-borderless mb-3">
+      <tr><td width="35%">भुगतान क्र.</td><td>#{{ payment.payment_id }}</td></tr>
+      <tr><td>मद</td><td>{{ payment.scheme_name }}</td></tr>
+      <tr><td>कार्य</td><td>{{ payment.work_code }} — {{ payment.work_name }}</td></tr>
+      <tr><td>बिल संख्या / दिनांक</td><td>{{ payment.bill_no }} / {{ payment.bill_date }}</td></tr>
+      <tr><td>फर्म</td><td>{{ payment.firm_name }}</td></tr>
+      <tr><td>PAN</td><td>{{ payment.pan_no or '—' }}</td></tr>
+      <tr><td>GST नंबर</td><td>{{ payment.gst_no or '—' }}</td></tr>
+      <tr><td>बैंक खाता</td><td>{{ payment.bank_account_no or '—' }} ({{ payment.bank_name or '—' }}, IFSC: {{ payment.bank_ifsc or '—' }})</td></tr>
+    </table>
+
+    <table class="table table-sm table-bordered mb-3">
+      <thead><tr><th>विवरण</th><th class="text-end">राशि (₹)</th></tr></thead>
+      <tbody>
+        <tr><td>सकल राशि (Gross)</td><td class="text-end">{{ "%.2f"|format(payment.gross_amount) }}</td></tr>
+        <tr><td>CGST @1%</td><td class="text-end">{{ "%.2f"|format(payment.cgst_1pct) }}</td></tr>
+        <tr><td>SGST @1%</td><td class="text-end">{{ "%.2f"|format(payment.sgst_1pct) }}</td></tr>
+        <tr><td>आयकर (TDS) @2%</td><td class="text-end">{{ "%.2f"|format(payment.income_tax_2pct) }}</td></tr>
+        <tr><td>Labour Cess</td><td class="text-end">{{ "%.2f"|format(payment.labour_cess_1pct) }}</td></tr>
+        <tr class="fw-bold"><td>कुल कटौती</td><td class="text-end">{{ "%.2f"|format(payment.total_deduction) }}</td></tr>
+        <tr class="fw-bold table-success"><td>निवल भुगतान (Net Payment)</td><td class="text-end">{{ "%.2f"|format(payment.net_payment) }}</td></tr>
+      </tbody>
+    </table>
+
+    <table class="table table-sm table-borderless mb-4">
+      <tr><td width="35%">PPA संख्या / दिनांक</td><td>{{ payment.ppa_no or '—' }} / {{ payment.ppa_date or '—' }}</td></tr>
+      <tr><td>चेक संख्या</td><td>{{ payment.cheque_number or '(अभी दर्ज नहीं)' }}</td></tr>
+      <tr><td>स्थिति</td><td>{{ payment.status }}</td></tr>
+    </table>
+
+    <div class="row mt-5 text-center">
+      <div class="col-4"><div style="border-top:1px solid #333; margin-top:50px;">तैयार कर्ता (Operator)</div></div>
+      <div class="col-4"><div style="border-top:1px solid #333; margin-top:50px;">सत्यापन (Accountant)</div></div>
+      <div class="col-4"><div style="border-top:1px solid #333; margin-top:50px;">अनुमोदन (EO)</div></div>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .d-print-none { display: none !important; }
+  nav, footer { display: none !important; }
+}
+</style>
+{% endblock %}
