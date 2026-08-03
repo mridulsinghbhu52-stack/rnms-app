@@ -26,6 +26,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('finance') }}">वित्त/आय</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('works_list') }}">कार्य/टेंडर</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('payments_queue') }}">भुगतान अनुमोदन</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('tax_remittance_home') }}">टैक्स सुलह</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('cashbook') }}">कैशबुक</a></li>
         {% if session.get('role_code') == 'ADMIN' %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('masters') }}">Masters</a></li>
