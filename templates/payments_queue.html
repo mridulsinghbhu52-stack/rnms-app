@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}भुगतान अनुमोदन{% endblock %}
 {% block content %}
-<h4 class="mb-3">भुगतान अनुमोदन क्रम — Account Operator Entry → Accountant Verification → EO Approval → Payment Posting</h4>
+<h4 class="mb-3">भुगतान अनुमोदन क्रम – Account Operator Entry → Accountant Verification → EO Approval → Payment Posting</h4>
 
 <table class="table table-sm bg-white shadow-sm">
   <thead><tr><th>कार्य</th><th>बिल</th><th>Gross</th><th>कटौती</th><th>Net</th><th>स्थिति</th><th>कार्रवाई</th></tr></thead>
@@ -15,16 +15,20 @@
     <td>{{ p.net_payment|amt }}</td>
     <td><span class="badge bg-secondary">{{ q_map.get(p.status, p.status) }}</span></td>
     <td>
+      <a href="{{ url_for('payment_voucher', payment_id=p.payment_id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">🖨️ Voucher</a>
       {% if p.status == 'ENTERED' and session.get('role_code') in ('ACCOUNTANT','ADMIN') %}
-      <form method="POST" action="{{ url_for('verify_payment', payment_id=p.payment_id) }}"><button class="btn btn-sm btn-outline-primary">सत्यापित करें</button></form>
+      <form method="POST" action="{{ url_for('verify_payment', payment_id=p.payment_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-primary">सत्यापित करें</button></form>
       {% elif p.status == 'VERIFIED' and session.get('role_code') in ('EO_ADMIN','ADMIN') %}
-      <form method="POST" action="{{ url_for('approve_payment', payment_id=p.payment_id) }}"><button class="btn btn-sm btn-outline-success">स्वीकृत करें</button></form>
+      <form method="POST" action="{{ url_for('approve_payment', payment_id=p.payment_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-success">स्वीकृत करें</button></form>
       {% elif p.status == 'APPROVED' and session.get('role_code') in ('ACCOUNTANT','ADMIN') %}
-      <form method="POST" action="{{ url_for('post_payment', payment_id=p.payment_id) }}"><button class="btn btn-sm btn-outline-dark">Post करें</button></form>
+      <form method="POST" action="{{ url_for('post_payment', payment_id=p.payment_id) }}" class="d-inline d-flex gap-1">
+        <input name="cheque_number" class="form-control form-control-sm" placeholder="चेक नंबर" style="width:120px" required>
+        <button class="btn btn-sm btn-outline-dark">Post करें</button>
+      </form>
       {% elif p.status == 'POSTED' %}
       <span class="text-success small">✓ पूर्ण</span>
       {% else %}
-      <span class="text-muted small">—</span>
+      <span class="text-muted small">–</span>
       {% endif %}
     </td>
   </tr>
