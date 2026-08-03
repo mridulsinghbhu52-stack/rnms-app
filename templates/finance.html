@@ -45,7 +45,7 @@
           <div class="col-md-2 mt-2"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">GO दर्ज करें</button></div>
         </form>
         <table class="table table-sm">
-          <thead><tr><th>मद</th><th>GO नं.</th><th>दिनांक</th><th>स्वीकृत राशि</th><th>प्राप्त</th><th>किस्त जोड़ें</th></tr></thead>
+          <thead><tr><th>मद</th><th>GO नं.</th><th>दिनांक</th><th>स्वीकृत राशि</th><th>प्राप्त</th><th>किस्त जोड़ें</th><th>दस्तावेज़</th></tr></thead>
           <tbody>
           {% for g in gos %}
           <tr>
@@ -61,6 +61,7 @@
                 <button class="btn btn-sm btn-outline-success">+</button>
               </form>
             </td>
+            <td><a href="{{ url_for('manage_documents', related_type='GO', related_id=g.go_id) }}" class="btn btn-sm btn-outline-secondary">📎</a></td>
           </tr>
           {% endfor %}
           </tbody>
