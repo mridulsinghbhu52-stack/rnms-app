@@ -904,6 +904,7 @@ DOC_CATEGORY_MAP = {
     ],
     "TENDER": [
         ("TENDER_NOTICE", "निविदा सूचना"),
+        ("EMD", "धरोहर राशि (EMD) रसीद"),
         ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),
         ("WORK_ORDER", "कार्यादेश (Work Order)"),
         ("AGREEMENT", "अनुबंध (Agreement)"),
