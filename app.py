@@ -503,7 +503,7 @@ def new_payment(bill_id):
         ["bill_id", "work_id", "gross_amount", "cgst_1pct", "sgst_1pct", "income_tax_2pct", "labour_cess_1pct",
          "no_deduction", "total_deduction", "net_payment", "balance_against_sanction", "balance_against_l1",
          "ppa_no", "ppa_date", "status", "entered_by", "remarks"],
-        (bill_id, work["work_id"], gross, cgst, sgst, income_tax, labour_cess, 1 if no_deduction else 0,
+        (bill_id, work["work_id"], gross, cgst, sgst, income_tax, labour_cess,no_deduction,
          total_deduction, net_payment, balance_sanction, balance_l1, request.form.get("ppa_no"),
          request.form.get("ppa_date") or None, "ENTERED", session["user_id"], request.form.get("remarks")))
     db.insert_and_get_id(conn, "payment_approval_log", "log_id",
