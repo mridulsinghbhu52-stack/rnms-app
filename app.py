@@ -1130,6 +1130,23 @@ def create_tax_remittance():
     conn.close()
     flash(f"जमा रिकॉर्ड बना — {len(payment_ids)} भुगतान जोड़े गए, कुल राशि {round(total,2)}", "success")
     return redirect(url_for("tax_remittance_home", period_month=period_month, tax_type=tax_type))
+# =============================================================================
+# app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
+# यह नया route है — भुगतान बनने के बाद, चेक कटने पर, चेक नंबर बाद में जोड़ने के लिए
+# (क्योंकि अब भुगतान बनते ही Post हो जाता है, इसलिए चेक नंबर उस समय पता नहीं होता)
+# =============================================================================
+
+@app.route("/payments/<int:payment_id>/cheque", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ACCOUNTANT", "ADMIN")
+def update_payment_cheque(payment_id):
+    conn = db.get_db()
+    cheque_number = request.form.get("cheque_number", "").strip()
+    db.run(conn, "UPDATE payments SET cheque_number=? WHERE payment_id=?", (cheque_number, payment_id))
+    conn.commit()
+    conn.close()
+    flash("चेक नंबर अपडेट हुआ।", "success")
+    return redirect(request.referrer or url_for("payments_queue"))
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
