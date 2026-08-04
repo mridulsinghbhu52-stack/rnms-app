@@ -476,6 +476,7 @@ def new_bill(work_id):
 # Payments — Account Operator Entry -> Accountant Verify -> EO Approve -> Post
 # ---------------------------------------------------------------------------
 
+
 @app.route("/bills/<int:bill_id>/payments/new", methods=["POST"])
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
 def new_payment(bill_id):
@@ -499,23 +500,35 @@ def new_payment(bill_id):
     prior_posted = db.fetchone(conn, "SELECT COALESCE(SUM(net_payment),0) AS v FROM payments WHERE work_id=? AND status='POSTED'", (work["work_id"],))["v"]
     balance_sanction = round(float(work["estimated_amount"]) - float(prior_posted) - net_payment, 2)
     balance_l1 = round(float(latest_tender["l1_amount"]) - float(prior_posted) - net_payment, 2) if latest_tender and latest_tender["l1_amount"] else None
+
+    bank_account_id = primary_bank_account(conn, work["scheme_id"])
+    if not bank_account_id:
+        conn.close()
+        flash("इस मद हेतु कोई बैंक खाता सेट नहीं है – पहले Masters में बैंक खाता जोड़ें।", "error")
+        return redirect(url_for("work_detail", work_id=work["work_id"]))
+
     payment_id = db.insert_and_get_id(conn, "payments", "payment_id",
         ["bill_id", "work_id", "gross_amount", "cgst_1pct", "sgst_1pct", "income_tax_2pct", "labour_cess_1pct",
          "no_deduction", "total_deduction", "net_payment", "balance_against_sanction", "balance_against_l1",
-         "ppa_no", "ppa_date", "status", "entered_by", "remarks"],
-        (bill_id, work["work_id"], gross, cgst, sgst, income_tax, labour_cess,no_deduction,
+         "ppa_no", "ppa_date", "status", "entered_by", "posted_by", "posted_at", "remarks"],
+        (bill_id, work["work_id"], gross, cgst, sgst, income_tax, labour_cess, no_deduction,
          total_deduction, net_payment, balance_sanction, balance_l1, request.form.get("ppa_no"),
-         request.form.get("ppa_date") or None, "ENTERED", session["user_id"], request.form.get("remarks")))
+         request.form.get("ppa_date") or None, "POSTED", session["user_id"], session["user_id"],
+         datetime.now().isoformat(), request.form.get("remarks")))
+
     db.insert_and_get_id(conn, "payment_approval_log", "log_id",
         ["payment_id", "action", "actor_user_id", "remarks"],
-        (payment_id, "ENTRY", session["user_id"], "Account Operator entry"))
-    db.run(conn, "UPDATE bills SET status='APPROVED' WHERE bill_id=?", (bill_id,))
+        (payment_id, "ENTRY_AND_POST", session["user_id"], "Account Operator entry — सरल workflow (सीधे Posted)"))
+
+    post_cashbook_entry(conn, bank_account_id, work["scheme_id"], today(),
+                         f"भुगतान – {work['work_code']} / बिल {bill['bill_no']}",
+                         payment=net_payment, reference_type="PAYMENT",
+                         reference_id=payment_id, created_by=session["user_id"])
+    db.run(conn, "UPDATE bills SET status='PAID' WHERE bill_id=?", (bill_id,))
     conn.commit()
     conn.close()
-    flash(f"भुगतान दर्ज हुआ — नेट राशि {fmt_amount(net_payment)} (सत्यापन हेतु लंबित)", "success")
+    flash(f"भुगतान पूर्ण हुआ – नेट राशि {fmt_amount(net_payment)}। अब 🖨️ Voucher प्रिंट करें।", "success")
     return redirect(url_for("work_detail", work_id=work["work_id"]))
-
-
 @app.route("/payments")
 @login_required
 def payments_queue():
