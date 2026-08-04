@@ -181,7 +181,7 @@ def new_bank_account():
     db.insert_and_get_id(conn, "bank_accounts", "account_id",
         ["account_no", "bank_name", "branch_name", "ifsc_code", "scheme_id", "opening_date", "is_active"],
         (request.form["account_no"], request.form["bank_name"], request.form.get("branch_name"),
-         request.form.get("ifsc_code"), scheme_id, request.form.get("opening_date") or None, 1))
+         request.form.get("ifsc_code"), scheme_id, request.form.get("opening_date") or None, True))
     conn.close()
     flash("बैंक खाता जोड़ा गया।", "success")
     return redirect(url_for("masters"))
