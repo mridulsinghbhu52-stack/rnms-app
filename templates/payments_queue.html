@@ -27,6 +27,14 @@
       </form>
       {% elif p.status == 'POSTED' %}
       <span class="text-success small">✓ पूर्ण</span>
+{% if p.cheque_number %}
+<span class="badge bg-light text-dark border">चेक: {{ p.cheque_number }}</span>
+{% else %}
+<form method="POST" action="{{ url_for('update_payment_cheque', payment_id=p.payment_id) }}" class="d-inline d-flex gap-1 mt-1">
+<input name="cheque_number" class="form-control form-control-sm" placeholder="चेक नंबर" style="width:110px" required>
+<button class="btn btn-sm btn-outline-dark">जोड़ें</button>
+</form>
+{% endif %}
       {% else %}
       <span class="text-muted small">–</span>
       {% endif %}
