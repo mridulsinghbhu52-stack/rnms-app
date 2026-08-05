@@ -1,1 +1,129 @@
 
+{% extends "base.html" %}
+{% block title %}पत्रावली नोटिंग{% endblock %}
+{% block content %}
+<style>
+  .noting-sheet { max-width: 820px; margin: 0 auto; background:#fff; padding: 28px 34px;
+                  font-family: "Nirmala UI", "Mangal", "Noto Sans Devanagari", serif;
+                  font-size: 15.5px; line-height: 2.0; text-align: justify; color:#000; }
+  .noting-sheet p { margin-bottom: 14px; }
+  .fillin { display:inline-block; min-width:150px; border-bottom:1px dotted #333; padding:0 6px;
+            text-align:center; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .noting-table { width:100%; border-collapse:collapse; font-size:12.5px; line-height:1.4; margin:14px 0; }
+  .noting-table th, .noting-table td { border:1px solid #000; padding:4px 3px; text-align:center; vertical-align:middle; }
+  .noting-table th { font-weight:600; }
+  .sign-block { margin-top:42px; text-align:right; line-height:1.6; }
+  .divider { border-top:1px dashed #999; margin:34px 0 22px; }
+  @media print {
+    .d-print-none { display:none !important; }
+    body { background:#fff; }
+    .noting-sheet { max-width:100%; padding:0; box-shadow:none; border:none !important; }
+    .fillin { border-bottom:1px dotted #000; }
+    @page { size: A4; margin: 18mm 16mm; }
+  }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:820px;margin:0 auto;">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">← वापस जाएं</a>
+  <span class="text-muted small align-self-center">बिंदीदार लाइनों पर क्लिक करके सीधे टाइप कर सकते हैं, फिर प्रिंट करें</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="noting-sheet border shadow-sm">
+
+  <p><strong>अधिशासी अधिकारी/अध्यक्ष महोदय,</strong></p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;कृपया पत्रावली के दाहिने ओर प्रस्तुत अवर अभियन्ता, नगर पंचायत रतसरकलां, बलिया द्वारा
+  ठे0/फर्म&mdash; <strong>&ldquo;{{ p.firm_name }}&rdquo;</strong> के पक्ष में स्वीकृत निविदा सम्बन्धित निर्माण कार्यादेश
+  दिनांक <span class="fillin" contenteditable="true">{{ wo_date_str }}</span> के {{ bill_ordinal }} रनिंग बिल
+  मु0&mdash;{{ "%.2f"|format(p.amount_incl_gst) }} ({{ p.amount_incl_gst|hword }}) का अवलोकन करने का कष्ट करें।</p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;उक्त कार्य के सम्बन्ध में सादर अवगत कराना है कि उक्त कार्य
+  <strong>&ldquo;{{ p.scheme_name }}&rdquo;</strong> की संस्तुतियों के अन्तर्गत प्राप्त धनराशि से कराया जा रहा था,
+  अवर अभियन्ता, नगर पंचायत रतसरकलां, जनपद&mdash;बलिया द्वारा उक्त का तैयार {{ bill_ordinal }} रनिंग बिल भुगतान का
+  विवरण इस प्रकार है:&mdash;</p>
+
+  <p><strong>कार्य का विवरण&mdash;</strong> {{ p.work_name }}{% if p.work_code %} ({{ p.work_code }}){% endif %}</p>
+
+  <table class="noting-table">
+    <thead>
+      <tr>
+        <th style="width:5%">क्र0<br>सं0</th>
+        <th>बिल की सकल<br>धनराशि</th>
+        <th>G.S.T.<br>{{ p.gst_rate|int if p.gst_rate else 18 }}%</th>
+        <th>योग<br>(2+3)</th>
+        <th>आयकर<br>2%</th>
+        <th>लेबर सेस<br>1%</th>
+        <th>C.G.S.T.<br>1%</th>
+        <th>S.G.S.T.<br>1%</th>
+        <th>कुल कटौती<br>धनराशि</th>
+        <th>शुद्ध देय<br>धनराशि</th>
+      </tr>
+      <tr>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td>{{ "%.2f"|format(p.amount_excl_gst) }}</td>
+        <td>{{ "%.2f"|format(gst_amount) }}</td>
+        <td>{{ "%.2f"|format(p.amount_incl_gst) }}</td>
+        <td>{{ "%.2f"|format(p.income_tax_2pct or 0) }}</td>
+        <td>{{ "%.2f"|format(p.labour_cess_1pct or 0) }}</td>
+        <td>{{ "%.2f"|format(p.cgst_1pct or 0) }}</td>
+        <td>{{ "%.2f"|format(p.sgst_1pct or 0) }}</td>
+        <td>{{ "%.2f"|format(p.total_deduction or 0) }}</td>
+        <td>{{ "%.2f"|format(p.net_payment or 0) }}</td>
+      </tr>
+      <tr>
+        <td><strong>योग&mdash;</strong></td>
+        <td><strong>{{ "%.2f"|format(p.amount_excl_gst) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(gst_amount) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.amount_incl_gst) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.income_tax_2pct or 0) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.labour_cess_1pct or 0) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.cgst_1pct or 0) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.sgst_1pct or 0) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.total_deduction or 0) }}</strong></td>
+        <td><strong>{{ "%.2f"|format(p.net_payment or 0) }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;उपरोक्त कार्य की कटौती मु0&mdash;{{ "%.2f"|format(p.total_deduction or 0) }} के बाद
+  शुद्ध भुगतान मु0&mdash;{{ "%.2f"|format(p.net_payment or 0) }} ({{ p.net_payment|hword }}) का बिल प्रस्तुत किया गया है।
+  अवर अभियन्ता द्वारा प्रस्तुत बिल का सत्यापन
+  <span class="fillin" style="min-width:340px" contenteditable="true"></span>
+  द्वारा किया गया है, और कार्य को संतोषजनक अंकित किया गया है। कराये गये कार्य का स्थल फोटोग्राफ्स साथ में संलग्न है।</p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;अतः आप महोदय उपरोक्त तथ्यों से सहमत हों तो सहमति की दशा में पत्रावली के दाहिने ओर
+  रखे बिल एवं रिपोर्ट व पत्रावली का अवलोकन करते हुए मु0&mdash;{{ "%.2f"|format(p.net_payment or 0) }}
+  ({{ p.net_payment|hword }}) ठेकेदार/फर्म&mdash; <strong>&ldquo;{{ p.firm_name }}&rdquo;</strong> के नाम भुगतान हेतु
+  स्वीकृति प्रदान करना चाहें।</p>
+
+  <div class="sign-block">
+    <div class="fillin" style="min-width:220px;border-bottom:none" contenteditable="true"></div><br>
+    <small>(हस्ताक्षर / पदनाम)</small>
+  </div>
+
+  <div class="divider"></div>
+
+  <p><strong>महोदय,</strong></p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;कृपया आपके स्वीकृत आदेश के क्रम में Payment Advice/Cheque
+  No. <span class="fillin" contenteditable="true">{{ p.cheque_number or '' }}</span>
+  Date <span class="fillin" style="min-width:120px" contenteditable="true"></span>
+  Rs.&mdash;{{ "%.2f"|format(p.net_payment or 0) }} का भुगतान हेतु प्रेषित है।</p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;कृपया हस्ताक्षर कर निर्गत करना चाहें।</p>
+
+  <div class="sign-block">
+    <div class="fillin" style="min-width:220px;border-bottom:none" contenteditable="true"></div><br>
+    <small>(हस्ताक्षर / पदनाम)</small>
+  </div>
+
+</div>
+{% endblock %}
