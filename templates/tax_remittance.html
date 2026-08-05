@@ -17,6 +17,9 @@
       <label class="form-label small">महीना</label>
       <input type="month" name="period_month" value="{{ period_month }}" class="form-control form-control-sm" onchange="this.form.submit()">
     </div>
+    <div class="col-md-4">
+      <a href="{{ url_for('tax_remittance_print', tax_type=tax_type, period_month=period_month) }}" class="btn btn-sm btn-outline-dark" target="_blank">🖨️ इस माह की सूची प्रिंट करें</a>
+    </div>
   </form>
 
   <div class="card mb-4">
