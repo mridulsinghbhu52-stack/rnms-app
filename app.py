@@ -1271,6 +1271,38 @@ def payment_noting(payment_id):
     return render_template("payment_noting.html", p=payment, gst_amount=gst_amount,
                             bill_ordinal=bill_ordinal, wo_date_str=wo_date_str,
                             bill_date_str=_ddmmyyyy(payment["bill_date"]))
+# =============================================================================
+# app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
+# यह "महीने-वार टैक्स कटौती सूची — चालान हेतु प्रिंट" वाला नया route है।
+# =============================================================================
+
+@app.route("/tax-remittance/print")
+@require_role("ACCOUNTANT", "ADMIN")
+def tax_remittance_print():
+    tax_type = request.args.get("tax_type") or "GST"
+    period_month = request.args.get("period_month") or today()[:7]
+    amt = TAX_TYPE_AMOUNT_EXPR.get(tax_type, "(p.cgst_1pct + p.sgst_1pct)")
+    col = TAX_TYPE_COL.get(tax_type, "gst_remittance_id")
+    start, end = _month_range(period_month)
+
+    conn = db.get_db()
+    rows = db.fetchall(conn, f"""SELECT p.payment_id, {amt} AS tax_amount, p.{col} AS remittance_id,
+                                    p.cheque_number, w.work_code, w.work_name,
+                                    b.bill_no, b.bill_date, b.amount_excl_gst,
+                                    f.firm_name, f.pan_no, f.gst_no
+                             FROM payments p
+                             JOIN works w ON w.work_id=p.work_id
+                             JOIN bills b ON b.bill_id=p.bill_id
+                             JOIN firms f ON f.firm_id=b.firm_id
+                             WHERE p.status='POSTED' AND p.posted_at>=? AND p.posted_at<?
+                             ORDER BY p.payment_id""", (start, end))
+    conn.close()
+
+    total = round(sum(float(r["tax_amount"] or 0) for r in rows), 2)
+    tax_label = dict(TAX_TYPE_LABELS).get(tax_type, tax_type)
+
+    return render_template("tax_remittance_print.html", rows=rows, total=total,
+                            tax_type=tax_type, tax_label=tax_label, period_month=period_month)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
