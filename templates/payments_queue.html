@@ -15,7 +15,7 @@
     <td>{{ p.net_payment|amt }}</td>
     <td><span class="badge bg-secondary">{{ q_map.get(p.status, p.status) }}</span></td>
     <td>
-      <a href="{{ url_for('payment_voucher', payment_id=p.payment_id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">🖨️ Voucher</a>
+      <a href="{{ url_for('payment_voucher', payment_id=p.payment_id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">🖨️ Voucher</a><a href="{{ url_for('payment_noting', payment_id=p.payment_id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">📄 नोटिंग</a>
       {% if p.status == 'ENTERED' and session.get('role_code') in ('ACCOUNTANT','ADMIN') %}
       <form method="POST" action="{{ url_for('verify_payment', payment_id=p.payment_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-primary">सत्यापित करें</button></form>
       {% elif p.status == 'VERIFIED' and session.get('role_code') in ('EO_ADMIN','ADMIN') %}
