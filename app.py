@@ -1147,6 +1147,130 @@ def update_payment_cheque(payment_id):
     conn.close()
     flash("चेक नंबर अपडेट हुआ।", "success")
     return redirect(request.referrer or url_for("payments_queue"))
+# =============================================================================
+# app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
+# यह "पत्रावली नोटिंग" (Office Note) प्रिंट फ़ॉर्मेट का पूरा कोड है —
+# साथ में हिंदी में राशि शब्दों में लिखने वाला converter भी।
+# =============================================================================
+
+HINDI_ONES = [
+    "", "एक", "दो", "तीन", "चार", "पाँच", "छह", "सात", "आठ", "नौ",
+    "दस", "ग्यारह", "बारह", "तेरह", "चौदह", "पंद्रह", "सोलह", "सत्रह", "अठारह", "उन्नीस",
+    "बीस", "इक्कीस", "बाईस", "तेईस", "चौबीस", "पच्चीस", "छब्बीस", "सत्ताईस", "अट्ठाईस", "उनतीस",
+    "तीस", "इकतीस", "बत्तीस", "तैंतीस", "चौंतीस", "पैंतीस", "छत्तीस", "सैंतीस", "अड़तीस", "उनतालीस",
+    "चालीस", "इकतालीस", "बयालीस", "तैंतालीस", "चौवालीस", "पैंतालीस", "छियालीस", "सैंतालीस", "अड़तालीस", "उनचास",
+    "पचास", "इक्यावन", "बावन", "तिरेपन", "चौवन", "पचपन", "छप्पन", "सत्तावन", "अट्ठावन", "उनसठ",
+    "साठ", "इकसठ", "बासठ", "तिरेसठ", "चौंसठ", "पैंसठ", "छियासठ", "सड़सठ", "अड़सठ", "उनहत्तर",
+    "सत्तर", "इकहत्तर", "बहत्तर", "तिहत्तर", "चौहत्तर", "पचहत्तर", "छिहत्तर", "सतहत्तर", "अठहत्तर", "उन्यासी",
+    "अस्सी", "इक्यासी", "बयासी", "तिरासी", "चौरासी", "पचासी", "छियासी", "सत्तासी", "अट्ठासी", "नवासी",
+    "नब्बे", "इक्यानबे", "बानबे", "तिरानबे", "चौरानबे", "पंचानबे", "छियानबे", "सत्तानबे", "अट्ठानबे", "निन्यानबे",
+]
+
+HINDI_ORDINALS = ["", "प्रथम", "द्वितीय", "तृतीय", "चतुर्थ", "पंचम", "षष्ठम", "सप्तम", "अष्टम", "नवम", "दशम"]
+
+
+def _hindi_below_thousand(n):
+    parts = []
+    if n >= 100:
+        parts.append(HINDI_ONES[n // 100] + " सौ")
+        n = n % 100
+    if n:
+        parts.append(HINDI_ONES[n])
+    return " ".join(parts)
+
+
+def hindi_number_words(n):
+    n = int(n)
+    if n == 0:
+        return "शून्य"
+    parts = []
+    crore = n // 10000000
+    n = n % 10000000
+    lakh = n // 100000
+    n = n % 100000
+    thousand = n // 1000
+    n = n % 1000
+    if crore:
+        parts.append(hindi_number_words(crore) + " करोड़")
+    if lakh:
+        parts.append(_hindi_below_thousand(lakh) + " लाख")
+    if thousand:
+        parts.append(_hindi_below_thousand(thousand) + " हजार")
+    if n:
+        parts.append(_hindi_below_thousand(n))
+    return " ".join(parts)
+
+
+def hindi_amount_words(amount):
+    try:
+        amount = float(amount or 0)
+    except (TypeError, ValueError):
+        return ""
+    rupees = int(amount)
+    paise = int(round((amount - rupees) * 100))
+    if paise:
+        return f"{hindi_number_words(rupees)} रुपये {hindi_number_words(paise)} पैसे मात्र"
+    return f"{hindi_number_words(rupees)} रुपये मात्र"
+
+
+app.jinja_env.filters["hword"] = hindi_amount_words
+
+
+def _ddmmyyyy(value):
+    if not value:
+        return ""
+    s = str(value)[:10]
+    parts = s.split("-")
+    if len(parts) == 3 and len(parts[0]) == 4:
+        return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    return s
+
+
+@app.route("/payments/<int:payment_id>/noting")
+@login_required
+def payment_noting(payment_id):
+    conn = db.get_db()
+    payment = db.fetchone(conn, """SELECT p.*, w.work_code, w.work_name, w.work_id AS w_id,
+                                    s.scheme_name, b.bill_no, b.bill_date, b.amount_excl_gst,
+                                    b.amount_incl_gst, b.gst_rate, f.firm_name, f.pan_no, f.gst_no
+                             FROM payments p
+                             JOIN works w ON w.work_id=p.work_id
+                             JOIN schemes s ON s.scheme_id=w.scheme_id
+                             JOIN bills b ON b.bill_id=p.bill_id
+                             JOIN firms f ON f.firm_id=b.firm_id
+                             WHERE p.payment_id=?""", (payment_id,))
+    if not payment:
+        conn.close()
+        flash("भुगतान नहीं मिला", "error")
+        return redirect(url_for("payments_queue"))
+
+    seq_row = db.fetchone(conn, "SELECT COUNT(*) AS c FROM bills WHERE work_id=? AND bill_id<=?",
+                          (payment["work_id"], payment["bill_id"]))
+    seq = int(seq_row["c"]) if seq_row else 1
+    bill_ordinal = HINDI_ORDINALS[seq] if 0 < seq < len(HINDI_ORDINALS) else f"{seq}वाँ"
+
+    wo_date_str = ""
+    try:
+        wo = db.fetchone(conn, "SELECT * FROM work_orders WHERE work_id=? ORDER BY wo_id DESC LIMIT 1",
+                         (payment["work_id"],))
+        if wo:
+            for key in ("wo_date", "work_order_date", "order_date"):
+                try:
+                    if wo[key]:
+                        wo_date_str = _ddmmyyyy(wo[key])
+                        break
+                except Exception:
+                    continue
+    except Exception:
+        wo_date_str = ""
+
+    conn.close()
+
+    gst_amount = round(float(payment["amount_incl_gst"] or 0) - float(payment["amount_excl_gst"] or 0), 2)
+
+    return render_template("payment_noting.html", p=payment, gst_amount=gst_amount,
+                            bill_ordinal=bill_ordinal, wo_date_str=wo_date_str,
+                            bill_date_str=_ddmmyyyy(payment["bill_date"]))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
