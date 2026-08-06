@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}निविदा{% endblock %}
+{% block content %}
+<h4 class="mb-3">निविदा सूचनाएँ (Tender Notices)</h4>
+
+{% if session.get('role_code') in ('ACCOUNT_OPERATOR','ADMIN') %}
+<div class="card mb-4">
+  <div class="card-header">नई निविदा सूचना दर्ज करें</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('new_tender_notice') }}" class="row g-2">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">निविदा सूचना संख्या *</label>
+        <input name="notice_no" class="form-control form-control-sm" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">सूचना दिनांक</label>
+        <input type="date" name="notice_date" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-0">मद (योजना)</label>
+        <select name="scheme_id" class="form-select form-select-sm">
+          <option value="">— चुनें —</option>
+          {% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">प्रकाशन दिनांक</label>
+        <input type="date" name="publish_date" class="form-control form-control-sm">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-0">e-Tender संदर्भ</label>
+        <input name="eproc_ref" class="form-control form-control-sm" placeholder="पोर्टल ID / संदर्भ">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-0">बिड जमा अंतिम तिथि</label>
+        <input type="date" name="bid_last_date" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">तकनीकी बिड खुलने की तिथि</label>
+        <input type="date" name="technical_open_date" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">वित्तीय बिड खुलने की तिथि</label>
+        <input type="date" name="financial_open_date" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">टिप्पणी</label>
+        <input name="remarks" class="form-control form-control-sm">
+      </div>
+
+      <div class="col-12 mt-2">
+        <button class="btn btn-sm btn-success">निविदा सूचना दर्ज करें</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<table class="table table-sm bg-white shadow-sm align-middle">
+  <thead>
+    <tr>
+      <th>सूचना सं.</th><th>दिनांक</th><th>मद</th><th>प्रकाशन</th>
+      <th class="text-center">कार्य</th><th class="text-end">कुल स्वीकृत राशि</th>
+      <th>स्थिति</th><th>दस्तावेज़</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for n in rows %}
+    <tr>
+      <td><strong>{{ n.notice_no }}</strong></td>
+      <td>{{ n.notice_date or '—' }}</td>
+      <td class="small">{{ n.scheme_name or '—' }}</td>
+      <td>{{ n.publish_date or '—' }}</td>
+      <td class="text-center">{{ n.work_count }}</td>
+      <td class="text-end">{{ n.total_amount|amt }}</td>
+      <td><span class="badge bg-secondary">{{ status_labels.get(n.status, n.status) }}</span></td>
+      <td><a href="{{ url_for('manage_documents', related_type='TENDER_NOTICE', related_id=n.notice_id) }}" title="निविदा दस्तावेज़ / अख़बार कतरन / e-Tender प्रति">📎</a></td>
+      <td><a href="{{ url_for('tender_notice_detail', notice_id=n.notice_id) }}" class="btn btn-sm btn-outline-primary">विवरण खोलें</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="text-center text-muted">अभी कोई निविदा सूचना दर्ज नहीं है।</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
