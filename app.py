@@ -618,6 +618,14 @@ def post_payment(payment_id):
 #         और प्रकार से छाँटने की सुविधा भी मिलेगी।
 # =============================================================================
 
+# =============================================================================
+# मौजूदा cashbook फ़ंक्शन को पूरा हटाकर यह पेस्ट करें
+# (app.py में खोजें: "def cashbook():" — उसकी @app.route("/cashbook") और
+#  @login_required लाइनों समेत, अगला @app.route शुरू होने से ठीक पहले तक)
+# बदलाव: अब मदवार सारांश (कुल आय / कुल व्यय / शेष), प्रकार का कॉलम,
+#         और प्रकार से छाँटने की सुविधा भी मिलेगी।
+# =============================================================================
+
 CASHBOOK_TYPE_LABELS = {
     "INSTALLMENT": "किस्त प्राप्त",
     "INTEREST": "बैंक ब्याज",
@@ -700,6 +708,7 @@ def cashbook():
                             summary=summary, income_rows=income_rows, expense_rows=expense_rows,
                             grand_receipt=grand_receipt, grand_payment=grand_payment,
                             type_labels=CASHBOOK_TYPE_LABELS)
+
 
 
 
