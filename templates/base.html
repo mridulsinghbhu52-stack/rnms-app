@@ -24,7 +24,8 @@
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">डैशबोर्ड</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('finance') }}">वित्त/आय</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('works_list') }}">कार्य/टेंडर</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('works_list') }}">कार्य</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('tender_notices') }}">निविदा</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('payments_queue') }}">भुगतान अनुमोदन</a></li>{% if session.get('role_code') in ('ACCOUNTANT','ADMIN') %}
 <li class="nav-item"><a class="nav-link" href="{{ url_for('tax_remittance_home') }}">टैक्स सुलह</a></li>
 {% endif %}
