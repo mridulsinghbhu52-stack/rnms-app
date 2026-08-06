@@ -1606,7 +1606,7 @@ def add_work_to_notice(notice_id):
 
     notice = db.fetchone(conn, "SELECT * FROM tender_notices WHERE notice_id=?", (notice_id,))
     excl = _excl_gst(work["estimated_amount"])
-    emd = _round_rupee(excl * EMD_PERCENT)
+    emd = emd = _emd_amount(excl)
     fee = to_float(request.form.get("tender_fee") or 0) or _tender_fee(excl)
 
     existing = db.fetchone(conn, "SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL ORDER BY tender_id DESC LIMIT 1", (work_id,))
