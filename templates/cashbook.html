@@ -97,7 +97,7 @@
 <table class="table table-sm bg-white shadow-sm">
   <thead>
     <tr>
-      <th>दिनांक</th><th>मद</th><th>प्रकार</th><th>खाता</th><th>विवरण</th>
+      <th>दिनांक</th><th>मद</th><th>प्रकार</th><th>फर्म / ठेकेदार</th><th>खाता</th><th>विवरण</th>
       <th class="cb-num">प्राप्ति</th><th class="cb-num">भुगतान</th><th class="cb-num">शेष</th>
     </tr>
   </thead>
@@ -113,6 +113,7 @@
         <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">{{ r.label }}</span>
         {% endif %}
       </td>
+      <td class="small">{{ r.firm or '—' }}</td>
       <td class="small">{{ r.e.account_no }}</td>
       <td class="small">{{ r.e.particulars }}</td>
       <td class="cb-num">{% if r.e.receipt_amount %}{{ r.e.receipt_amount|amt }}{% endif %}</td>
@@ -120,7 +121,7 @@
       <td class="cb-num"><strong>{{ r.balance|amt }}</strong></td>
     </tr>
     {% else %}
-    <tr><td colspan="8" class="text-center text-muted">कोई प्रविष्टि नहीं मिली।</td></tr>
+    <tr><td colspan="9" class="text-center text-muted">कोई प्रविष्टि नहीं मिली।</td></tr>
     {% endfor %}
   </tbody>
 </table>
