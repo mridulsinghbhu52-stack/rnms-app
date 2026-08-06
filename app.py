@@ -1443,17 +1443,26 @@ def tax_remittance_print():
 # EMD/टेंडर फीस, तकनीकी-वित्तीय बिड, L1, एग्रीमेंट व कार्यादेश।
 # =============================================================================
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, ROUND_CEILING
 
-EMD_PERCENT = 0.10           # धरोहर राशि — टेंडर धनराशि का 10% (बदला जा सकता है)
+EMD_PERCENT = 0.10           # धरोहर राशि — टेंडर धनराशि का 10%
 TENDER_GST_RATE = 0.18       # टेंडर धनराशि + 18% = स्वीकृत धनराशि
-TENDER_FEE_PER_LAKH = 100.0  # निविदा प्रपत्र शुल्क — प्रति लाख ₹100, उस पर 18% GST
+TENDER_FEE_PER_LAKH = 100.0  # निविदा प्रपत्र शुल्क — प्रति लाख ₹100, फिर उस पर 18% GST
 
 
 def _round_rupee(value):
-    """पूर्णांक रुपये — 0.49 नीचे, 0.50 ऊपर (1.49 → 1, 1.50 → 2)"""
+    """पूर्णांक रुपये — 0.49 नीचे, 0.50 ऊपर"""
     try:
         return float(Decimal(str(float(value or 0))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except Exception:
+        return 0.0
+
+
+def _ceil_to(value, step):
+    """ऊपर की ओर पूर्णांक — जैसे 336271.20 को 1000 में → 337000"""
+    try:
+        v = Decimal(str(float(value or 0))) / Decimal(str(step))
+        return float(v.quantize(Decimal("1"), rounding=ROUND_CEILING) * Decimal(str(step)))
     except Exception:
         return 0.0
 
@@ -1466,11 +1475,16 @@ def _excl_gst(amount):
         return 0.0
 
 
+def _emd_amount(excl_amount):
+    """धरोहर राशि — टेंडर धनराशि का 10%, ऊपर की ओर ₹1,000 में पूर्णांक"""
+    return _ceil_to(float(excl_amount or 0) * EMD_PERCENT, 1000)
+
+
 def _tender_fee(excl_amount):
-    """निविदा प्रपत्र शुल्क — टेंडर धनराशि पर ₹100 प्रति लाख, फिर उस पर 18% GST"""
+    """निविदा प्रपत्र शुल्क — ₹100 प्रति लाख (ऊपर ₹10 में पूर्णांक) + उस पर 18% GST"""
     try:
-        base = _round_rupee(float(excl_amount or 0) / 100000.0 * TENDER_FEE_PER_LAKH)
-        return _round_rupee(base * (1 + TENDER_GST_RATE))
+        base = _ceil_to(float(excl_amount or 0) / 100000.0 * TENDER_FEE_PER_LAKH, 10)
+        return _round_rupee(base + base * TENDER_GST_RATE)
     except (TypeError, ValueError):
         return 0.0
 
