@@ -991,7 +991,14 @@ def import_works():
 # भाग B — Documents Module (GO/Estimate/Photo/Tender/Agreement/MB/Voucher)
 # #############################################################################
 
-DOC_CATEGORY_MAP = {
+DOC_CATEGORY_MAP = {"TENDER_NOTICE": [
+        ("NOTICE_DOC", "निविदा दस्तावेज़ (NIT)"),
+        ("PUBLICATION", "सूचना प्रकाशन (अख़बार कतरन)"),
+        ("EPROC", "e-Tender पोर्टल प्रति / रसीद"),
+        ("TECH_BID_RECORD", "तकनीकी बिड अभिलेख"),
+        ("FIN_BID_RECORD", "वित्तीय बिड अभिलेख"),
+        ("OTHER", "अन्य"),
+    ],
     "GO": [
         ("GO_ORDER", "शासनादेश (GO) स्कैन कॉपी"),
     ],
@@ -1004,7 +1011,8 @@ DOC_CATEGORY_MAP = {
     "TENDER": [
         ("TENDER_NOTICE", "निविदा सूचना"),
         ("EMD", "धरोहर राशि (EMD) रसीद"),
-        ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),
+        ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),("L1_PAPERS", "L1 के हार्ड पेपर"),
+        ("EMD_BANK_VERIFY", "EMD बैंक सत्यापन"),
         ("WORK_ORDER", "कार्यादेश (Work Order)"),
         ("AGREEMENT", "अनुबंध (Agreement)"),
     ],
