@@ -626,6 +626,14 @@ def post_payment(payment_id):
 #         और प्रकार से छाँटने की सुविधा भी मिलेगी।
 # =============================================================================
 
+# =============================================================================
+# मौजूदा cashbook फ़ंक्शन को पूरा हटाकर यह पेस्ट करें
+# (app.py में खोजें: "def cashbook():" — उसकी @app.route("/cashbook") और
+#  @login_required लाइनों समेत, अगला @app.route शुरू होने से ठीक पहले तक)
+# बदलाव: अब मदवार सारांश (कुल आय / कुल व्यय / शेष), प्रकार का कॉलम,
+#         और प्रकार से छाँटने की सुविधा भी मिलेगी।
+# =============================================================================
+
 CASHBOOK_TYPE_LABELS = {
     "INSTALLMENT": "किस्त प्राप्त",
     "INTEREST": "बैंक ब्याज",
@@ -683,13 +691,20 @@ def cashbook():
                                     GROUP BY c.reference_type""", tuple(sparams))
 
     schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
+
+    firm_map = {}
+    for fr in db.fetchall(conn, """SELECT p.payment_id, f.firm_name
+                                   FROM payments p JOIN bills b ON b.bill_id=p.bill_id
+                                   JOIN firms f ON f.firm_id=b.firm_id"""):
+        firm_map[fr["payment_id"]] = fr["firm_name"]
     conn.close()
 
     running = 0.0
     rows = []
     for e in entries:
         running += float(e["receipt_amount"] or 0) - float(e["payment_amount"] or 0)
-        rows.append({"e": e, "balance": round(running, 2),
+        firm = firm_map.get(e["reference_id"]) if e["reference_type"] == "PAYMENT" else None
+        rows.append({"e": e, "balance": round(running, 2), "firm": firm,
                      "label": CASHBOOK_TYPE_LABELS.get(e["reference_type"], e["reference_type"] or "—")})
 
     income_rows, expense_rows = [], []
@@ -708,6 +723,7 @@ def cashbook():
                             summary=summary, income_rows=income_rows, expense_rows=expense_rows,
                             grand_receipt=grand_receipt, grand_payment=grand_payment,
                             type_labels=CASHBOOK_TYPE_LABELS)
+
 
 
 
