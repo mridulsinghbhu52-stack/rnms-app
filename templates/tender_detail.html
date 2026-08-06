@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}निविदा — {{ notice.notice_no }}{% endblock %}
+{% block content %}
+{% set can_edit = session.get('role_code') in ('ACCOUNT_OPERATOR','ADMIN') %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">निविदा सूचना — {{ notice.notice_no }}</h4>
+  <div>
+    <a href="{{ url_for('manage_documents', related_type='TENDER_NOTICE', related_id=notice.notice_id) }}" class="btn btn-sm btn-outline-secondary">📎 सूचना के दस्तावेज़</a>
+    <a href="{{ url_for('tender_notices') }}" class="btn btn-sm btn-outline-secondary">← सूची पर वापस</a>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">सूचना का विवरण</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('update_tender_notice', notice_id=notice.notice_id) }}" class="row g-2">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">निविदा सूचना संख्या</label>
+        <input name="notice_no" value="{{ notice.notice_no }}" class="form-control form-control-sm" required {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">सूचना दिनांक</label>
+        <input type="date" name="notice_date" value="{{ notice.notice_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">प्रकाशन दिनांक</label>
+        <input type="date" name="publish_date" value="{{ notice.publish_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">बिड जमा अंतिम तिथि</label>
+        <input type="date" name="bid_last_date" value="{{ notice.bid_last_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">मद (योजना)</label>
+        <input value="{{ notice.scheme_name or '—' }}" class="form-control form-control-sm" disabled>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-0">e-Tender संदर्भ</label>
+        <input name="eproc_ref" value="{{ notice.eproc_ref or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-0">तकनीकी बिड खुलने की तिथि</label>
+        <input type="date" name="technical_open_date" value="{{ notice.technical_open_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">वित्तीय बिड खुलने की तिथि</label>
+        <input type="date" name="financial_open_date" value="{{ notice.financial_open_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">स्थिति</label>
+        <select name="status" class="form-select form-select-sm" {% if not can_edit %}disabled{% endif %}>
+          {% for code, label in statuses %}
+          <option value="{{ code }}" {% if notice.status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">टिप्पणी</label>
+        <input name="remarks" value="{{ notice.remarks or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+
+      {% if can_edit %}
+      <div class="col-12 mt-2"><button class="btn btn-sm btn-primary">सूचना अपडेट करें</button></div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card text-center"><div class="card-body py-2">
+    <div class="small text-muted">कुल स्वीकृत राशि</div><div class="fs-6"><strong>{{ total_est|amt }}</strong></div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body py-2">
+    <div class="small text-muted">कुल टेंडर धनराशि</div><div class="fs-6"><strong>{{ total_excl|amt }}</strong></div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body py-2">
+    <div class="small text-muted">कुल EMD</div><div class="fs-6"><strong>{{ total_emd|amt }}</strong></div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body py-2">
+    <div class="small text-muted">कुल L1 राशि</div><div class="fs-6"><strong>{{ total_l1|amt }}</strong></div></div></div></div>
+</div>
+
+{% if can_edit %}
+<div class="card mb-4">
+  <div class="card-header">इस निविदा में कार्य जोड़ें</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('add_work_to_notice', notice_id=notice.notice_id) }}" class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label class="form-label small mb-0">कार्य चुनें</label>
+        <select name="work_id" class="form-select form-select-sm" required>
+          <option value="">— कार्य चुनें —</option>
+          {% for w in available %}
+          <option value="{{ w.work_id }}">{{ w.work_code }} — {{ w.work_name[:60] }} ({{ w.estimated_amount|amt }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">टेंडर फीस (खाली छोड़ें तो अपने-आप)</label>
+        <input name="tender_fee" class="form-control form-control-sm" placeholder="अपने-आप">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-sm btn-success w-100">जोड़ें</button>
+      </div>
+      <div class="col-12"><small class="text-muted">जोड़ते ही टेंडर धनराशि (स्वीकृत ÷ 1.18), EMD ({{ emd_percent }}%) और फीस (₹100 प्रति लाख + 18% GST) अपने-आप भर जाएँगी — बाद में बदली जा सकती हैं।</small></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<h6 class="mb-2">इस निविदा में शामिल कार्य ({{ entries|length }})</h6>
+
+{% for e in entries %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <div><strong>{{ e.work_code }}</strong> — <span class="small">{{ e.work_name }}</span></div>
+    <div>
+      <a href="{{ url_for('manage_documents', related_type='TENDER', related_id=e.tender_id) }}" class="btn btn-sm btn-outline-secondary" title="तकनीकी/वित्तीय बिड, L1 पेपर, EMD, एग्रीमेंट, कार्यादेश">📎 दस्तावेज़</a>
+      {% if can_edit %}
+      <form method="POST" action="{{ url_for('remove_work_from_notice', tender_id=e.tender_id) }}" class="d-inline"
+            onsubmit="return confirm('इस कार्य को निविदा से हटाएँ?');">
+        <button class="btn btn-sm btn-outline-danger">हटाएँ</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('update_tender_entry', tender_id=e.tender_id) }}" class="row g-2">
+      <div class="col-md-2">
+        <label class="form-label small mb-0">स्वीकृत राशि (GST सहित)</label>
+        <input value="{{ '%.2f'|format(e.estimated_amount or 0) }}" class="form-control form-control-sm" disabled>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">टेंडर धनराशि</label>
+        <input name="amount_excl_gst" value="{{ '%.2f'|format(e.amount_excl_gst or 0) }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">निविदा फीस</label>
+        <input name="tender_fee" value="{{ '%.2f'|format(e.tender_fee or 0) }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">EMD राशि</label>
+        <input name="emd_amount" value="{{ '%.2f'|format(e.emd_amount or 0) }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">EMD बैंक संदर्भ</label>
+        <input name="emd_bank_ref" value="{{ e.emd_bank_ref or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="emd_verified" id="emdv{{ e.tender_id }}" {% if e.emd_verified %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+          <label class="form-check-label small" for="emdv{{ e.tender_id }}">EMD बैंक से सत्यापित</label>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-0">L1 फर्म</label>
+        <select name="l1_firm_id" class="form-select form-select-sm" {% if not can_edit %}disabled{% endif %}>
+          <option value="">— चुनें —</option>
+          {% for f in firms %}
+          <option value="{{ f.firm_id }}" {% if e.l1_firm_id == f.firm_id %}selected{% endif %}>{{ f.firm_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">L1 राशि (भुगतान सीमा)</label>
+        <input name="l1_amount" value="{{ '%.2f'|format(e.l1_amount or 0) if e.l1_amount else '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">एग्रीमेंट संख्या</label>
+        <input name="agreement_no" value="{{ e.agreement_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">एग्रीमेंट दिनांक</label>
+        <input type="date" name="agreement_date" value="{{ e.agreement_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+      </div>
+      <div class="col-md-3 d-flex align-items-end gap-2">
+        {% if can_edit %}<button class="btn btn-sm btn-primary">सहेजें</button>{% endif %}
+        <a href="{{ url_for('work_detail', work_id=e.work_id) }}" class="btn btn-sm btn-outline-secondary">कार्य विवरण</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">इस निविदा में अभी कोई कार्य नहीं जोड़ा गया।</p>
+{% endfor %}
+{% endblock %}
