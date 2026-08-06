@@ -610,23 +610,97 @@ def post_payment(payment_id):
 # Cashbook
 # ---------------------------------------------------------------------------
 
+# =============================================================================
+# मौजूदा cashbook फ़ंक्शन को पूरा हटाकर यह पेस्ट करें
+# (app.py में खोजें: "def cashbook():" — उसकी @app.route("/cashbook") और
+#  @login_required लाइनों समेत, अगला @app.route शुरू होने से ठीक पहले तक)
+# बदलाव: अब मदवार सारांश (कुल आय / कुल व्यय / शेष), प्रकार का कॉलम,
+#         और प्रकार से छाँटने की सुविधा भी मिलेगी।
+# =============================================================================
+
+CASHBOOK_TYPE_LABELS = {
+    "INSTALLMENT": "किस्त प्राप्त",
+    "INTEREST": "बैंक ब्याज",
+    "REFUND": "बैंक चार्ज वापसी",
+    "OPENING": "आरम्भिक शेष",
+    "PAYMENT": "ठेकेदार भुगतान",
+    "TAX_REMITTANCE": "कटौती जमा (टैक्स)",
+    "BANK_CHARGE": "बैंक चार्ज",
+}
+
+CASHBOOK_INCOME_TYPES = ["INSTALLMENT", "INTEREST", "REFUND", "OPENING"]
+CASHBOOK_EXPENSE_TYPES = ["PAYMENT", "TAX_REMITTANCE", "BANK_CHARGE"]
+
+
 @app.route("/cashbook")
 @login_required
 def cashbook():
     conn = db.get_db()
     scheme_id = request.args.get("scheme_id")
-    sql = """SELECT c.*, s.scheme_name, ba.account_no FROM cashbook_entries c
-             JOIN schemes s ON s.scheme_id=c.scheme_id
-             JOIN bank_accounts ba ON ba.account_id=c.bank_account_id"""
-    params = ()
+    ref_type = request.args.get("ref_type")
+
+    where, params = [], []
     if scheme_id:
-        sql += " WHERE c.scheme_id=?"
-        params = (scheme_id,)
-    sql += " ORDER BY c.entry_id DESC"
-    entries = db.fetchall(conn, sql, params)
+        where.append("c.scheme_id=?")
+        params.append(scheme_id)
+    if ref_type:
+        where.append("c.reference_type=?")
+        params.append(ref_type)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+
+    entries = db.fetchall(conn, f"""SELECT c.*, s.scheme_name, ba.account_no FROM cashbook_entries c
+                                    JOIN schemes s ON s.scheme_id=c.scheme_id
+                                    JOIN bank_accounts ba ON ba.account_id=c.bank_account_id
+                                    {where_sql}
+                                    ORDER BY c.entry_date, c.entry_id""", tuple(params))
+
+    swhere, sparams = [], []
+    if scheme_id:
+        swhere.append("c.scheme_id=?")
+        sparams.append(scheme_id)
+    swhere_sql = (" WHERE " + " AND ".join(swhere)) if swhere else ""
+    summary = db.fetchall(conn, f"""SELECT s.scheme_id, s.scheme_name,
+                                        COALESCE(SUM(c.receipt_amount),0) AS total_receipt,
+                                        COALESCE(SUM(c.payment_amount),0) AS total_payment
+                                    FROM cashbook_entries c JOIN schemes s ON s.scheme_id=c.scheme_id
+                                    {swhere_sql}
+                                    GROUP BY s.scheme_id, s.scheme_name
+                                    ORDER BY s.scheme_name""", tuple(sparams))
+
+    breakup = db.fetchall(conn, f"""SELECT c.reference_type AS rt,
+                                        COALESCE(SUM(c.receipt_amount),0) AS total_receipt,
+                                        COALESCE(SUM(c.payment_amount),0) AS total_payment
+                                    FROM cashbook_entries c
+                                    {swhere_sql}
+                                    GROUP BY c.reference_type""", tuple(sparams))
+
     schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
     conn.close()
-    return render_template("cashbook.html", entries=entries, schemes=schemes, selected_scheme=scheme_id)
+
+    running = 0.0
+    rows = []
+    for e in entries:
+        running += float(e["receipt_amount"] or 0) - float(e["payment_amount"] or 0)
+        rows.append({"e": e, "balance": round(running, 2),
+                     "label": CASHBOOK_TYPE_LABELS.get(e["reference_type"], e["reference_type"] or "—")})
+
+    income_rows, expense_rows = [], []
+    for b in breakup:
+        label = CASHBOOK_TYPE_LABELS.get(b["rt"], b["rt"] or "अन्य")
+        if float(b["total_receipt"] or 0):
+            income_rows.append({"label": label, "amount": float(b["total_receipt"])})
+        if float(b["total_payment"] or 0):
+            expense_rows.append({"label": label, "amount": float(b["total_payment"])})
+
+    grand_receipt = round(sum(float(x["total_receipt"] or 0) for x in summary), 2)
+    grand_payment = round(sum(float(x["total_payment"] or 0) for x in summary), 2)
+
+    return render_template("cashbook.html", rows=rows, schemes=schemes,
+                            selected_scheme=scheme_id, ref_type=ref_type,
+                            summary=summary, income_rows=income_rows, expense_rows=expense_rows,
+                            grand_receipt=grand_receipt, grand_payment=grand_payment,
+                            type_labels=CASHBOOK_TYPE_LABELS)
+
 
 
 # ---------------------------------------------------------------------------
