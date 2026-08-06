@@ -1,30 +1,127 @@
 {% extends "base.html" %}
 {% block title %}कैशबुक{% endblock %}
 {% block content %}
-<h4 class="mb-3">कैशबुक (Auto-generated)</h4>
+<style>
+  .cb-num { text-align:right; white-space:nowrap; }
+  @media print {
+    .d-print-none { display:none !important; }
+    @page { size: A4 landscape; margin: 12mm; }
+  }
+</style>
 
-<form method="GET" class="row g-2 mb-3">
-  <div class="col-md-3">
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">कैशबुक (Auto-generated)</h4>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-dark d-print-none">🖨️ प्रिंट करें</button>
+</div>
+
+<form method="GET" class="row g-2 mb-3 d-print-none">
+  <div class="col-md-4">
     <select name="scheme_id" class="form-select form-select-sm" onchange="this.form.submit()">
       <option value="">सभी मद</option>
-      {% for s in schemes %}<option value="{{ s.scheme_id }}" {{ 'selected' if selected_scheme|string == s.scheme_id|string else '' }}>{{ s.scheme_name }}</option>{% endfor %}
+      {% for s in schemes %}
+      <option value="{{ s.scheme_id }}" {% if selected_scheme and selected_scheme|string == s.scheme_id|string %}selected{% endif %}>{{ s.scheme_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="ref_type" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">सभी प्रकार</option>
+      {% for code, label in type_labels.items() %}
+      <option value="{{ code }}" {% if ref_type == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
     </select>
   </div>
 </form>
 
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white py-2">आय (प्राप्ति)</div>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% for r in income_rows %}
+          <tr><td>{{ r.label }}</td><td class="cb-num">{{ r.amount|amt }}</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="text-center text-muted">कोई प्राप्ति दर्ज नहीं</td></tr>
+          {% endfor %}
+          <tr class="table-light"><td><strong>कुल आय</strong></td><td class="cb-num"><strong>{{ grand_receipt|amt }}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header bg-danger text-white py-2">व्यय (भुगतान)</div>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% for r in expense_rows %}
+          <tr><td>{{ r.label }}</td><td class="cb-num">{{ r.amount|amt }}</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="text-center text-muted">कोई व्यय दर्ज नहीं</td></tr>
+          {% endfor %}
+          <tr class="table-light"><td><strong>कुल व्यय</strong></td><td class="cb-num"><strong>{{ grand_payment|amt }}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header bg-dark text-white py-2">मदवार शेष</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>मद</th><th class="cb-num">आय</th><th class="cb-num">व्यय</th><th class="cb-num">शेष</th></tr></thead>
+        <tbody>
+          {% for s in summary %}
+          <tr>
+            <td class="small">{{ s.scheme_name }}</td>
+            <td class="cb-num small">{{ s.total_receipt|amt }}</td>
+            <td class="cb-num small">{{ s.total_payment|amt }}</td>
+            <td class="cb-num small"><strong>{{ (s.total_receipt|float - s.total_payment|float)|amt }}</strong></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted">कोई प्रविष्टि नहीं</td></tr>
+          {% endfor %}
+          <tr class="table-light">
+            <td><strong>कुल</strong></td>
+            <td class="cb-num"><strong>{{ grand_receipt|amt }}</strong></td>
+            <td class="cb-num"><strong>{{ grand_payment|amt }}</strong></td>
+            <td class="cb-num"><strong>{{ (grand_receipt - grand_payment)|amt }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <table class="table table-sm bg-white shadow-sm">
-  <thead><tr><th>दिनांक</th><th>मद</th><th>खाता</th><th>विवरण</th><th class="text-end">प्राप्ति</th><th class="text-end">भुगतान</th><th class="text-end">Running Balance</th></tr></thead>
+  <thead>
+    <tr>
+      <th>दिनांक</th><th>मद</th><th>प्रकार</th><th>खाता</th><th>विवरण</th>
+      <th class="cb-num">प्राप्ति</th><th class="cb-num">भुगतान</th><th class="cb-num">शेष</th>
+    </tr>
+  </thead>
   <tbody>
-  {% for e in entries %}
-  <tr>
-    <td>{{ e.entry_date }}</td><td>{{ e.scheme_name }}</td><td>{{ e.account_no }}</td><td>{{ e.particulars }}</td>
-    <td class="text-end">{{ e.receipt_amount|amt if e.receipt_amount and e.receipt_amount|float > 0 else '' }}</td>
-    <td class="text-end">{{ e.payment_amount|amt if e.payment_amount and e.payment_amount|float > 0 else '' }}</td>
-    <td class="text-end fw-bold">{{ e.running_balance|amt }}</td>
-  </tr>
-  {% else %}
-  <tr><td colspan="7" class="text-center text-muted">अभी कोई प्रविष्टि नहीं है।</td></tr>
-  {% endfor %}
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.e.entry_date }}</td>
+      <td class="small">{{ r.e.scheme_name }}</td>
+      <td>
+        {% if r.e.reference_type in ('INSTALLMENT','INTEREST','REFUND','OPENING') %}
+        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">{{ r.label }}</span>
+        {% else %}
+        <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">{{ r.label }}</span>
+        {% endif %}
+      </td>
+      <td class="small">{{ r.e.account_no }}</td>
+      <td class="small">{{ r.e.particulars }}</td>
+      <td class="cb-num">{% if r.e.receipt_amount %}{{ r.e.receipt_amount|amt }}{% endif %}</td>
+      <td class="cb-num">{% if r.e.payment_amount %}{{ r.e.payment_amount|amt }}{% endif %}</td>
+      <td class="cb-num"><strong>{{ r.balance|amt }}</strong></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="text-center text-muted">कोई प्रविष्टि नहीं मिली।</td></tr>
+    {% endfor %}
   </tbody>
 </table>
 {% endblock %}
