@@ -1102,6 +1102,13 @@ def tax_remittance_home():
                             period_month=period_month, tax_type=tax_type, tax_types=TAX_TYPE_LABELS)
 
 
+# =============================================================================
+# मौजूदा create_tax_remittance फ़ंक्शन को पूरा हटाकर यह पेस्ट करें
+# (app.py में खोजें: "def create_tax_remittance" — उसकी @app.route/@require_role
+#  लाइनों समेत, अगला @app.route शुरू होने से ठीक पहले तक)
+# बदलाव: अब टैक्स जमा करने पर कैशबुक में भी "व्यय" की एंट्री बनेगी (मदवार अलग-अलग)
+# =============================================================================
+
 @app.route("/tax-remittance/create", methods=["POST"])
 @require_role("ACCOUNTANT", "ADMIN")
 def create_tax_remittance():
@@ -1127,10 +1134,30 @@ def create_tax_remittance():
         (tax_type, period_month, round(total, 2), cheque_number, remittance_date, remarks, session["user_id"]))
     for pid in payment_ids:
         db.run(conn, f"UPDATE payments SET {col}=? WHERE payment_id=?", (remittance_id, pid))
+
+    # ---- कैशबुक में व्यय की एंट्री — प्रत्येक मद (योजना) के लिए अलग ----
+    tax_label = dict(TAX_TYPE_LABELS).get(tax_type, tax_type)
+    scheme_totals = {}
+    for pid in payment_ids:
+        row = db.fetchone(conn, f"""SELECT w.scheme_id AS sid, {amt_expr} AS amt
+                                    FROM payments p JOIN works w ON w.work_id=p.work_id
+                                    WHERE p.payment_id=?""", (pid,))
+        if row and row["amt"]:
+            scheme_totals[row["sid"]] = scheme_totals.get(row["sid"], 0.0) + float(row["amt"])
+    for sid, amt in scheme_totals.items():
+        bank_account_id = primary_bank_account(conn, sid)
+        if bank_account_id and amt:
+            post_cashbook_entry(conn, bank_account_id, sid, remittance_date or today(),
+                                 f"कटौती जमा – {tax_label} (माह {period_month})" +
+                                 (f" / चालान-चेक {cheque_number}" if cheque_number else ""),
+                                 payment=round(amt, 2), reference_type="TAX_REMITTANCE",
+                                 reference_id=remittance_id, created_by=session["user_id"])
+
     conn.commit()
     conn.close()
-    flash(f"जमा रिकॉर्ड बना — {len(payment_ids)} भुगतान जोड़े गए, कुल राशि {round(total,2)}", "success")
+    flash(f"जमा रिकॉर्ड बना — {len(payment_ids)} भुगतान जोड़े गए, कुल राशि {round(total,2)} (कैशबुक में भी दर्ज)", "success")
     return redirect(url_for("tax_remittance_home", period_month=period_month, tax_type=tax_type))
+
 # =============================================================================
 # app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
 # यह नया route है — भुगतान बनने के बाद, चेक कटने पर, चेक नंबर बाद में जोड़ने के लिए
