@@ -1642,6 +1642,8 @@ def tender_notice_detail(notice_id):
     accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
                                     LEFT JOIN schemes s ON s.scheme_id=ba.scheme_id
                                     ORDER BY ba.account_id""")
+    gos = db.fetchall(conn, """SELECT go_id, scheme_id, go_number, go_date, govt_letter_ref
+                               FROM go_register ORDER BY scheme_id, go_number""")
     conn.close()
 
     total_est = round(sum(float(e["estimated_amount"] or 0) for e in entries), 2)
@@ -1650,7 +1652,7 @@ def tender_notice_detail(notice_id):
     total_l1 = round(sum(float(e["l1_amount"] or 0) for e in entries), 2)
 
     return render_template("tender_detail.html", notice=notice, entries=entries,
-                            available=available, firms=firms, schemes=schemes, accounts=accounts,
+                            available=available, firms=firms, schemes=schemes, accounts=accounts,gos=gos,
                             total_est=total_est, total_excl=total_excl,
                             total_emd=total_emd, total_l1=total_l1,
                             statuses=NOTICE_STATUS_LABELS, emd_percent=int(EMD_PERCENT * 100))
