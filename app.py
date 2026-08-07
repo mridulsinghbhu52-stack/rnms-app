@@ -1722,7 +1722,7 @@ def update_tender_entry(tender_id):
         return redirect(url_for("tender_notices"))
 
     l1_firm_id = request.form.get("l1_firm_id")
-   db.run(conn, """UPDATE tenders SET bid_no=?, amount_excl_gst=?, tender_fee=?, emd_amount=?, work_duration=?,
+    db.run(conn, """UPDATE tenders SET bid_no=?, amount_excl_gst=?, tender_fee=?, emd_amount=?, work_duration=?,
                        emd_verified=?, emd_bank_ref=?, l1_firm_id=?, l1_amount=?,
                        agreement_no=?, agreement_date=? WHERE tender_id=?""",
            (request.form.get("bid_no"),
