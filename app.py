@@ -1568,8 +1568,12 @@ def tender_notices():
     accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
                                     LEFT JOIN schemes s ON s.scheme_id=ba.scheme_id
                                     ORDER BY ba.account_id""")
+    gos = db.fetchall(conn, """SELECT go_id, scheme_id, go_number, go_date, govt_letter_ref
+                               FROM go_register ORDER BY scheme_id, go_number""")
+    gos = db.fetchall(conn, """SELECT go_id, scheme_id, go_number, go_date, govt_letter_ref
+                               FROM go_register ORDER BY scheme_id, go_number""")
     conn.close()
-    return render_template("tenders_list.html", rows=rows, schemes=schemes, accounts=accounts,
+    return render_template("tenders_list.html", rows=rows, schemes=schemes, accounts=accounts,gos=gos,
                             status_labels=dict(NOTICE_STATUS_LABELS))
 
 
