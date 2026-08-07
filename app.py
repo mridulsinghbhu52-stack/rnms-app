@@ -1497,6 +1497,59 @@ NOTICE_STATUS_LABELS = [
     ("CANCELLED", "निरस्त"),
 ]
 
+HINDI_MONTHS = ["", "जनवरी", "फरवरी", "मार्च", "अप्रैल", "मई", "जून",
+                "जुलाई", "अगस्त", "सितम्बर", "अक्टूबर", "नवम्बर", "दिसम्बर"]
+
+
+def _hindi_date(value):
+    """2025-05-19 → 19 मई, 2025"""
+    if not value:
+        return ""
+    s = str(value)[:10].split("-")
+    if len(s) != 3:
+        return str(value)
+    try:
+        return f"{int(s[2])} {HINDI_MONTHS[int(s[1])]}, {s[0]}"
+    except Exception:
+        return str(value)
+
+
+def _dmy(value):
+    """2025-05-19 → 19.05.2025"""
+    if not value:
+        return ""
+    s = str(value)[:10].split("-")
+    return f"{s[2]}.{s[1]}.{s[0]}" if len(s) == 3 else str(value)
+
+
+app.jinja_env.filters["hdate"] = _hindi_date
+app.jinja_env.filters["dmy"] = _dmy
+
+
+def _notice_form_values(form):
+    scheme_id = form.get("scheme_id")
+    return {
+        "notice_no": form["notice_no"],
+        "letter_no": form.get("letter_no"),
+        "tender_type": form.get("tender_type") or "अल्पकालिक",
+        "notice_date": form.get("notice_date") or None,
+        "scheme_id": int(scheme_id) if scheme_id else None,
+        "publish_date": form.get("publish_date") or None,
+        "publish_time": form.get("publish_time"),
+        "download_start_date": form.get("download_start_date") or None,
+        "download_time": form.get("download_time"),
+        "upload_start_date": form.get("upload_start_date") or None,
+        "upload_start_time": form.get("upload_start_time"),
+        "bid_last_date": form.get("bid_last_date") or None,
+        "upload_last_time": form.get("upload_last_time"),
+        "financial_open_date": form.get("financial_open_date") or None,
+        "open_time": form.get("open_time"),
+        "technical_open_date": form.get("technical_open_date") or None,
+        "eproc_ref": form.get("eproc_ref"),
+        "fee_bank_account_id": int(form["fee_bank_account_id"]) if form.get("fee_bank_account_id") else None,
+        "remarks": form.get("remarks"),
+    }
+
 
 @app.route("/tenders")
 @login_required
@@ -1511,8 +1564,11 @@ def tender_notices():
                             LEFT JOIN schemes s ON s.scheme_id=n.scheme_id
                             ORDER BY n.notice_id DESC""")
     schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
+    accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
+                                    LEFT JOIN schemes s ON s.scheme_id=ba.scheme_id
+                                    ORDER BY ba.account_id""")
     conn.close()
-    return render_template("tenders_list.html", rows=rows, schemes=schemes,
+    return render_template("tenders_list.html", rows=rows, schemes=schemes, accounts=accounts,
                             status_labels=dict(NOTICE_STATUS_LABELS))
 
 
@@ -1520,19 +1576,27 @@ def tender_notices():
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
 def new_tender_notice():
     conn = db.get_db()
-    scheme_id = request.form.get("scheme_id")
-    notice_id = db.insert_and_get_id(conn, "tender_notices", "notice_id",
-        ["notice_no", "notice_date", "scheme_id", "publish_date",
-         "eproc_ref",
-         "bid_last_date", "technical_open_date", "financial_open_date", "status", "remarks", "created_by"],
-        (request.form["notice_no"], request.form.get("notice_date") or None,
-         int(scheme_id) if scheme_id else None, request.form.get("publish_date") or None,
-         request.form.get("eproc_ref"), request.form.get("bid_last_date") or None,
-         request.form.get("technical_open_date") or None, request.form.get("financial_open_date") or None,
-         "PUBLISHED", request.form.get("remarks"), session["user_id"]))
+    v = _notice_form_values(request.form)
+    cols = list(v.keys()) + ["status", "created_by"]
+    vals = tuple(list(v.values()) + ["PUBLISHED", session["user_id"]])
+    notice_id = db.insert_and_get_id(conn, "tender_notices", "notice_id", cols, vals)
     conn.commit()
     conn.close()
     flash("निविदा सूचना दर्ज हुई। अब इसमें कार्य जोड़ें।", "success")
+    return redirect(url_for("tender_notice_detail", notice_id=notice_id))
+
+
+@app.route("/tenders/<int:notice_id>/update", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def update_tender_notice(notice_id):
+    conn = db.get_db()
+    v = _notice_form_values(request.form)
+    v["status"] = request.form.get("status") or "PUBLISHED"
+    sets = ", ".join(f"{k}=?" for k in v.keys())
+    db.run(conn, f"UPDATE tender_notices SET {sets} WHERE notice_id=?", tuple(list(v.values()) + [notice_id]))
+    conn.commit()
+    conn.close()
+    flash("निविदा सूचना अपडेट हुई।", "success")
     return redirect(url_for("tender_notice_detail", notice_id=notice_id))
 
 
@@ -1549,18 +1613,25 @@ def tender_notice_detail(notice_id):
         return redirect(url_for("tender_notices"))
 
     entries = db.fetchall(conn, """SELECT t.*, w.work_code, w.work_name, w.estimated_amount,
-                                       w.status AS work_status, f.firm_name
+                                       w.status AS work_status, w.go_id, f.firm_name,
+                                       g.go_number, g.go_date, g.govt_letter_ref, s2.scheme_name
                                 FROM tenders t
                                 JOIN works w ON w.work_id=t.work_id
+                                LEFT JOIN go_register g ON g.go_id=w.go_id
+                                LEFT JOIN schemes s2 ON s2.scheme_id=w.scheme_id
                                 LEFT JOIN firms f ON f.firm_id=t.l1_firm_id
                                 WHERE t.notice_id=?
-                                ORDER BY w.work_code""", (notice_id,))
+                                ORDER BY g.go_id, w.work_code""", (notice_id,))
 
     available = db.fetchall(conn, """SELECT w.work_id, w.work_code, w.work_name, w.estimated_amount
                                   FROM works w
                                   WHERE w.work_id NOT IN (SELECT work_id FROM tenders WHERE notice_id IS NOT NULL)
                                   ORDER BY w.work_code""")
     firms = db.fetchall(conn, "SELECT * FROM firms ORDER BY firm_name")
+    schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
+    accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
+                                    LEFT JOIN schemes s ON s.scheme_id=ba.scheme_id
+                                    ORDER BY ba.account_id""")
     conn.close()
 
     total_est = round(sum(float(e["estimated_amount"] or 0) for e in entries), 2)
@@ -1569,28 +1640,10 @@ def tender_notice_detail(notice_id):
     total_l1 = round(sum(float(e["l1_amount"] or 0) for e in entries), 2)
 
     return render_template("tender_detail.html", notice=notice, entries=entries,
-                            available=available, firms=firms,
+                            available=available, firms=firms, schemes=schemes, accounts=accounts,
                             total_est=total_est, total_excl=total_excl,
                             total_emd=total_emd, total_l1=total_l1,
                             statuses=NOTICE_STATUS_LABELS, emd_percent=int(EMD_PERCENT * 100))
-
-
-@app.route("/tenders/<int:notice_id>/update", methods=["POST"])
-@require_role("ACCOUNT_OPERATOR", "ADMIN")
-def update_tender_notice(notice_id):
-    conn = db.get_db()
-    db.run(conn, """UPDATE tender_notices SET notice_no=?, notice_date=?, publish_date=?,
-                       eproc_ref=?, bid_last_date=?, technical_open_date=?, financial_open_date=?,
-                       status=?, remarks=? WHERE notice_id=?""",
-           (request.form["notice_no"], request.form.get("notice_date") or None,
-            request.form.get("publish_date") or None,
-            request.form.get("eproc_ref"), request.form.get("bid_last_date") or None,
-            request.form.get("technical_open_date") or None, request.form.get("financial_open_date") or None,
-            request.form.get("status"), request.form.get("remarks"), notice_id))
-    conn.commit()
-    conn.close()
-    flash("निविदा सूचना अपडेट हुई।", "success")
-    return redirect(url_for("tender_notice_detail", notice_id=notice_id))
 
 
 @app.route("/tenders/<int:notice_id>/works/add", methods=["POST"])
@@ -1606,22 +1659,23 @@ def add_work_to_notice(notice_id):
 
     notice = db.fetchone(conn, "SELECT * FROM tender_notices WHERE notice_id=?", (notice_id,))
     excl = _excl_gst(work["estimated_amount"])
-    emd = emd = _emd_amount(excl)
+    emd = _emd_amount(excl)
     fee = to_float(request.form.get("tender_fee") or 0) or _tender_fee(excl)
+    duration = request.form.get("work_duration") or "3 माह"
 
     existing = db.fetchone(conn, "SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL ORDER BY tender_id DESC LIMIT 1", (work_id,))
     if existing:
-        db.run(conn, """UPDATE tenders SET notice_id=?, amount_excl_gst=?, emd_amount=?, tender_fee=?
-                        WHERE tender_id=?""", (notice_id, excl, emd, fee, existing["tender_id"]))
+        db.run(conn, """UPDATE tenders SET notice_id=?, amount_excl_gst=?, emd_amount=?, tender_fee=?, work_duration=?
+                        WHERE tender_id=?""", (notice_id, excl, emd, fee, duration, existing["tender_id"]))
     else:
         db.insert_and_get_id(conn, "tenders", "tender_id",
-            ["work_id", "notice_id", "tender_no", "tender_date", "amount_excl_gst", "emd_amount", "tender_fee"],
-            (work_id, notice_id, notice["notice_no"], notice["notice_date"], excl, emd, fee))
+            ["work_id", "notice_id", "tender_no", "tender_date", "amount_excl_gst", "emd_amount", "tender_fee", "work_duration"],
+            (work_id, notice_id, notice["notice_no"], notice["notice_date"], excl, emd, fee, duration))
 
     db.run(conn, "UPDATE works SET status='TENDERED' WHERE work_id=?", (work_id,))
     conn.commit()
     conn.close()
-    flash(f"कार्य जोड़ा गया — शुद्ध राशि {fmt_amount(excl)}, EMD {fmt_amount(emd)}", "success")
+    flash(f"कार्य जोड़ा गया — टेंडर धनराशि {fmt_amount(excl)}, EMD {fmt_amount(emd)}, फीस {fmt_amount(fee)}", "success")
     return redirect(url_for("tender_notice_detail", notice_id=notice_id))
 
 
@@ -1636,12 +1690,13 @@ def update_tender_entry(tender_id):
         return redirect(url_for("tender_notices"))
 
     l1_firm_id = request.form.get("l1_firm_id")
-    db.run(conn, """UPDATE tenders SET amount_excl_gst=?, tender_fee=?, emd_amount=?,
+    db.run(conn, """UPDATE tenders SET amount_excl_gst=?, tender_fee=?, emd_amount=?, work_duration=?,
                        emd_verified=?, emd_bank_ref=?, l1_firm_id=?, l1_amount=?,
                        agreement_no=?, agreement_date=? WHERE tender_id=?""",
            (to_float(request.form.get("amount_excl_gst") or 0),
             to_float(request.form.get("tender_fee") or 0),
             to_float(request.form.get("emd_amount") or 0),
+            request.form.get("work_duration"),
             bool(request.form.get("emd_verified")),
             request.form.get("emd_bank_ref"),
             int(l1_firm_id) if l1_firm_id else None,
@@ -1667,6 +1722,57 @@ def remove_work_from_notice(tender_id):
         flash("कार्य इस निविदा से हटा दिया गया।", "success")
     conn.close()
     return redirect(url_for("tender_notice_detail", notice_id=notice_id) if notice_id else url_for("tender_notices"))
+
+
+# -----------------------------------------------------------------------------
+# निविदा आमंत्रण सूचना (NIT) — प्रिंट
+# -----------------------------------------------------------------------------
+
+@app.route("/tenders/<int:notice_id>/nit")
+@login_required
+def tender_nit_print(notice_id):
+    conn = db.get_db()
+    notice = db.fetchone(conn, """SELECT n.*, s.scheme_name FROM tender_notices n
+                                  LEFT JOIN schemes s ON s.scheme_id=n.scheme_id
+                                  WHERE n.notice_id=?""", (notice_id,))
+    if not notice:
+        conn.close()
+        flash("निविदा सूचना नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+
+    entries = db.fetchall(conn, """SELECT t.*, w.work_name, w.work_code, w.estimated_amount, w.go_id,
+                                       g.go_number, g.go_date, g.govt_letter_ref, s2.scheme_name
+                                FROM tenders t
+                                JOIN works w ON w.work_id=t.work_id
+                                LEFT JOIN go_register g ON g.go_id=w.go_id
+                                LEFT JOIN schemes s2 ON s2.scheme_id=w.scheme_id
+                                WHERE t.notice_id=?
+                                ORDER BY g.go_id, w.work_code""", (notice_id,))
+
+    account = None
+    if notice["fee_bank_account_id"]:
+        account = db.fetchone(conn, "SELECT * FROM bank_accounts WHERE account_id=?", (notice["fee_bank_account_id"],))
+    conn.close()
+
+    # GO-वार समूह बनाएं (क्रम बना रहे)
+    groups, seen = [], {}
+    for e in entries:
+        key = e["go_id"]
+        if key not in seen:
+            seen[key] = {"scheme_name": e["scheme_name"], "govt_letter_ref": e["govt_letter_ref"],
+                          "go_number": e["go_number"], "go_date": e["go_date"], "items": []}
+            groups.append(seen[key])
+        seen[key]["items"].append(e)
+
+    letter_refs = [g["govt_letter_ref"] for g in groups if g["govt_letter_ref"]]
+    scheme_names = []
+    for g in groups:
+        if g["scheme_name"] and g["scheme_name"] not in scheme_names:
+            scheme_names.append(g["scheme_name"])
+
+    return render_template("tender_nit.html", notice=notice, groups=groups, account=account,
+                            letter_refs=letter_refs, scheme_names=scheme_names,
+                            emd_percent=int(EMD_PERCENT * 100), total_works=len(entries))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
