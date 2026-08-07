@@ -100,33 +100,89 @@
 
 {% if can_edit %}
 <div class="card mb-4">
-  <div class="card-header">इस निविदा में कार्य जोड़ें</div>
+  <div class="card-header">इस निविदा में कार्य जोड़ें &mdash;
+    <small class="text-muted">जिन कार्यों का टेंडर हो चुका है वे सूची में नहीं आते</small></div>
   <div class="card-body">
-    <form method="POST" action="{{ url_for('add_work_to_notice', notice_id=notice.notice_id) }}" class="row g-2 align-items-end">
-      <div class="col-md-6">
-        <label class="form-label small mb-0">कार्य चुनें</label>
-        <select name="work_id" class="form-select form-select-sm" required>
-          <option value="">— कार्य चुनें —</option>
-          {% for w in available %}
-          <option value="{{ w.work_id }}">{{ w.work_code }} — {{ w.work_name[:60] }} ({{ w.estimated_amount|amt }})</option>
-          {% endfor %}
-        </select>
+    <form method="POST" action="{{ url_for('add_work_to_notice', notice_id=notice.notice_id) }}">
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">कार्य खोजें</label>
+          <input id="workSearch" class="form-control form-control-sm" placeholder="कार्य का नाम / कोड / GO / योजना">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-0">कार्यावधि (सभी चुने कार्यों के लिए)</label>
+          <input name="work_duration" class="form-control form-control-sm" placeholder="3 माह">
+        </div>
+        <div class="col-md-3">
+          <button type="button" id="selAll" class="btn btn-sm btn-outline-secondary w-100">सभी चुनें / हटाएं</button>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-sm btn-success w-100">जोड़ें</button>
+        </div>
       </div>
-      <div class="col-md-2">
-        <label class="form-label small mb-0">कार्यावधि</label>
-        <input name="work_duration" class="form-control form-control-sm" placeholder="3 माह">
+
+      <div style="max-height:320px;overflow:auto;border:1px solid #dee2e6;border-radius:6px;">
+        <table class="table table-sm table-hover mb-0" id="workTable">
+          <thead class="table-light" style="position:sticky;top:0;">
+            <tr>
+              <th style="width:38px"></th>
+              <th style="width:110px">कार्य कोड</th>
+              <th>कार्य का नाम</th>
+              <th style="width:130px">योजना</th>
+              <th style="width:120px">शासनादेश</th>
+              <th style="width:120px" class="text-end">स्वीकृत धनराशि</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for w in available %}
+            <tr>
+              <td><input type="checkbox" name="work_id" value="{{ w.work_id }}" class="form-check-input wchk"></td>
+              <td>{{ w.work_code }}</td>
+              <td>{{ w.work_name }}</td>
+              <td class="small text-muted">{{ w.scheme_name or '' }}</td>
+              <td class="small text-muted">{{ w.go_number or '' }}</td>
+              <td class="text-end">{{ w.estimated_amount|amt }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-3">
+              कोई ऐसा कार्य नहीं बचा जिसका टेंडर न हुआ हो।</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="col-md-2">
-        <label class="form-label small mb-0">निविदा फीस</label>
-        <input name="tender_fee" class="form-control form-control-sm" placeholder="अपने-आप">
-      </div>
-      <div class="col-md-2">
-        <button class="btn btn-sm btn-success w-100">जोड़ें</button>
-      </div>
-      <div class="col-12"><small class="text-muted">टेंडर धनराशि = स्वीकृत ÷ 1.18 · EMD = उसका {{ emd_percent }}% (ऊपर ₹1,000 में) · फीस = ₹100 प्रति लाख (ऊपर ₹10 में) + 18% GST — सब बाद में बदली जा सकती हैं।</small></div>
+
+      <small class="text-muted d-block mt-2">टेंडर धनराशि = स्वीकृत &divide; 1.18 &middot;
+        EMD = उसका {{ emd_percent }}% (ऊपर &#8377;1,000 में) &middot;
+        फीस = &#8377;100 प्रति लाख (ऊपर &#8377;10 में) + 18% GST &mdash; सब बाद में बदली जा सकती हैं।</small>
     </form>
   </div>
 </div>
+
+<script>
+(function(){
+  var box = document.getElementById('workSearch');
+  var tbl = document.getElementById('workTable');
+  if (box && tbl) {
+    box.addEventListener('input', function(){
+      var q = this.value.toLowerCase().trim();
+      tbl.querySelectorAll('tbody tr').forEach(function(tr){
+        tr.style.display = (!q || tr.innerText.toLowerCase().indexOf(q) > -1) ? '' : 'none';
+      });
+    });
+  }
+  var btn = document.getElementById('selAll');
+  if (btn) {
+    btn.addEventListener('click', function(){
+      var rows = Array.prototype.filter.call(
+        tbl.querySelectorAll('tbody tr'), function(tr){ return tr.style.display !== 'none'; });
+      var boxes = [];
+      rows.forEach(function(tr){ tr.querySelectorAll('.wchk').forEach(function(c){ boxes.push(c); }); });
+      var allOn = boxes.length > 0 && boxes.every(function(c){ return c.checked; });
+      boxes.forEach(function(c){ c.checked = !allOn; });
+    });
+  }
+})();
+</script>
 {% endif %}
 
 <h6 class="mb-2">इस निविदा में शामिल कार्य ({{ entries|length }})</h6>
