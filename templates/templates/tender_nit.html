@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}निविदा आमंत्रण सूचना{% endblock %}
+{% block content %}
+<style>
+  .nit { max-width: 880px; margin: 0 auto; background:#fff; padding: 26px 34px; color:#000;
+         font-family: "Nirmala UI", "Mangal", "Noto Sans Devanagari", serif; font-size: 14px; line-height: 1.85; }
+  .nit h5 { text-align:center; font-weight:700; margin-bottom:10px; }
+  .nit .title { text-align:center; font-weight:700; text-decoration:underline; margin: 12px 0; }
+  .nit p { text-align: justify; margin-bottom: 10px; }
+  .nit table { width:100%; border-collapse:collapse; font-size:12.5px; line-height:1.5; margin:10px 0 14px; }
+  .nit th, .nit td { border:1px solid #000; padding:4px 6px; vertical-align:top; }
+  .nit th { text-align:center; font-weight:600; }
+  .num { text-align:right; white-space:nowrap; }
+  .c { text-align:center; }
+  .grp { text-align:center; font-weight:600; background:#f2f2f2; }
+  .terms { margin-top:16px; }
+  .terms ol { padding-left: 22px; }
+  .terms li { margin-bottom: 6px; text-align: justify; }
+  .terms ol ol { padding-left: 20px; margin-top:4px; }
+  .fillin { display:inline-block; min-width:120px; border-bottom:1px dotted #333; padding:0 5px; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .signs { display:flex; justify-content:space-between; margin-top:60px; text-align:center; }
+  @media print {
+    .d-print-none { display:none !important; }
+    .nit { max-width:100%; padding:0; border:none !important; box-shadow:none !important; }
+    @page { size: A4; margin: 14mm 13mm; }
+  }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:880px;margin:0 auto;">
+  <a href="{{ url_for('tender_notice_detail', notice_id=notice.notice_id) }}" class="btn btn-sm btn-outline-secondary">← वापस</a>
+  <span class="text-muted small align-self-center">बिंदीदार जगहों पर क्लिक करके सुधार सकते हैं, फिर प्रिंट करें</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="nit border shadow-sm">
+
+  <h5>कार्यालय नगर पंचायत रतसरकलाँ, जनपद&mdash;बलिया</h5>
+
+  <div style="display:flex;justify-content:space-between;">
+    <div>पत्रांक:&mdash; <span class="fillin">{{ notice.letter_no or '' }}</span></div>
+    <div>दिनांक:&mdash; {{ notice.notice_date|hdate }}</div>
+  </div>
+
+  <div class="title">{{ notice.tender_type or 'अल्पकालिक' }} ई&mdash;टेण्डरिंग निविदा आमंत्रण सूचना</div>
+
+  <p>नगर पंचायत रतसरकलाँ, बलिया को उत्तर प्रदेश शासन के पत्र संख्या&mdash;{% if letter_refs %}{{ letter_refs|join(' एवं शासन के पत्र संख्या—') }}{% else %}<span class="fillin" style="min-width:420px"></span>{% endif %} के द्वारा इस निकाय को
+  <strong>&ldquo;{{ scheme_names|join(' / ') if scheme_names else notice.scheme_name }}&rdquo;</strong> के अन्तर्गत प्राप्त धनराशि से
+  <span class="fillin" style="min-width:200px">निर्माण कार्य</span> कराने हेतु समस्त ठेकेदारों/आपूर्तिकर्ताओं से निविदा आमंत्रित करती है।
+  समस्त निविदाएँ वेबसाइट <u>www.etenderup.nic.in</u> पर देखी जा सकती है। आमंत्रित समस्त पंजीकरण ठेकेदारों को
+  {{ emd_percent }} प्रतिशत अग्रिम जमानत धनराशि जमा करना अनिवार्य है।</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:8%">क्र0सं0</th><th>विवरण</th><th style="width:34%">दिनांक / समय</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="c">1</td><td>वेबसाइट पर ई&mdash;निविदा प्रकाशन की तिथि व समय</td>
+          <td class="c">{{ notice.publish_date|dmy }} {{ notice.publish_time or '' }}</td></tr>
+      <tr><td class="c">2</td><td>ई&mdash;निविदा डाउनलोड की प्रारम्भ तिथि / समय</td>
+          <td class="c">{{ notice.download_start_date|dmy }} {{ notice.download_time or '' }}</td></tr>
+      <tr><td class="c">3</td><td>ई&mdash;निविदा अपलोड की प्रारम्भ तिथि / समय</td>
+          <td class="c">{{ notice.upload_start_date|dmy }} {{ notice.upload_start_time or '' }}</td></tr>
+      <tr><td class="c">4</td><td>ई&mdash;निविदा अपलोड की अंतिम तिथि / समय</td>
+          <td class="c">{{ notice.bid_last_date|dmy }} {{ notice.upload_last_time or '' }}</td></tr>
+      <tr><td class="c">5</td><td>ई&mdash;निविदा खोली जाने की तिथि / समय</td>
+          <td class="c">{{ notice.financial_open_date|dmy }} {{ notice.open_time or '' }}</td></tr>
+    </tbody>
+  </table>
+
+  <p>www.etenderup.nic.in पर उक्त निविदाओं की विस्तृत जानकारी हेतु लागऑन करके देखी जा सकती है।</p>
+
+  <div class="title" style="text-decoration:none;">कार्यों की सूची</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:6%">क्र0<br>सं0</th>
+        <th>कार्य का विवरण</th>
+        <th style="width:15%">अनुमानित धनराशि<br>+18% जी0एस0टी0</th>
+        <th style="width:13%">धरोहर धनराशि<br>(आगणन का {{ emd_percent }}%)</th>
+        <th style="width:14%">निविदा प्रपत्र का<br>मूल्य+18% जी0एस0टी0</th>
+        <th style="width:9%">कार्यावधि</th>
+      </tr>
+      <tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+    </thead>
+    <tbody>
+      {% set ns = namespace(i=0) %}
+      {% for g in groups %}
+      <tr><td colspan="6" class="grp">
+        &ldquo;{{ g.scheme_name }}&rdquo; योजना<br>
+        <span style="font-weight:400">{{ g.govt_letter_ref or ('शासनादेश ' ~ (g.go_number or '') ~ ' दि0 ' ~ (g.go_date|dmy)) }}</span>
+      </td></tr>
+      {% for e in g["items"] %}
+      {% set ns.i = ns.i + 1 %}
+      <tr>
+        <td class="c">{{ '%02d'|format(ns.i) }}</td>
+        <td>{{ e.work_name }}</td>
+        <td class="num">{{ '%.2f'|format(e.estimated_amount or 0) }}</td>
+        <td class="num">{{ '%.2f'|format(e.emd_amount or 0) }}</td>
+        <td class="num">{{ '%.2f'|format(e.tender_fee or 0) }}</td>
+        <td class="c">{{ e.work_duration or '' }}</td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+      {% if not groups %}
+      <tr><td colspan="6" class="c">इस निविदा में अभी कोई कार्य नहीं जोड़ा गया।</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="terms">
+    <strong>नियम एवं शर्तें&mdash;</strong>
+    <ol>
+      <li>ई&mdash;निविदा प्रपत्र का शुल्क कालम&mdash;5 के अनुसार (जो वापस नहीं किया जायेगा) नगर पंचायत रतसरकलाँ के
+        खाता सं0&mdash;<span class="fillin">{{ account.account_no if account else '' }}</span>,
+        IFSC Code&mdash;<span class="fillin">{{ account.ifsc_code if account else '' }}</span>,
+        बैंक&mdash;<span class="fillin">{{ account.bank_name if account else '' }}</span>,
+        शाखा&mdash;<span class="fillin">{{ account.branch_name if account else '' }}</span>
+        में जमा/R.T.G.S. करना अनिवार्य होगा और उसकी प्रति ई&mdash;टेण्डर पर अपलोड करना होगा तथा मूल प्रति निविदा के
+        साथ जमा करना होगा। अन्यथा निविदा निरस्त समझी जायेगी।</li>
+
+      <li>धरोहर धनराशि कालम&mdash;4 के अनुसार जमानत धनराशि (EMD) के रूप में अधिशासी अधिकारी, नगर पंचायत रतसरकलाँ
+        के पक्ष में एफ0डी0आर0/टी0डी0आर0/कैश जमा किया जाना अनिवार्य होगा, अन्यथा निविदा निरस्त समझी जायेगी।</li>
+
+      <li>प्रत्येक ई&mdash;निविदा टेक्निकल बिड के साथ निम्नलिखित प्रपत्र संलग्न करना अनिवार्य होगा&mdash;
+        <ol>
+          <li>ई&mdash;निविदा शुल्क की रसीद की छायाप्रति।</li>
+          <li>EMD धरोहर धनराशि की प्रति।</li>
+          <li>जिलाधिकारी द्वारा निर्गत हैसियत प्रमाण&mdash;पत्र, T4।</li>
+          <li>जिलाधिकारी द्वारा निर्गत चरित्र प्रमाण&mdash;पत्र, T5।</li>
+          <li>पंजीयन प्रमाण&mdash;पत्र।</li>
+          <li>आयकर विभाग द्वारा निर्गत पैन कार्ड की छायाप्रति।</li>
+          <li>आधार कार्ड की छायाप्रति।</li>
+          <li>जी0एस0टी0 रजिस्ट्रेशन प्रपत्र।</li>
+          <li>श्रम विभाग द्वारा निर्गत पंजिकरण प्रमाण&mdash;पत्र।</li>
+          <li>विगत 3&mdash;वर्ष का आई0टी0आर0 रिटर्न सर्टिफिकेट।</li>
+          <li>सी0ए0 द्वारा प्रमाणित विगत 3&mdash;वर्ष का टर्न ओवर सार्टिफिकेट।</li>
+          <li>विगत वर्षों का अनुभव प्रमाण पत्र।</li>
+          <li>100 रू0 का स्टाम्प्स सादा पेपर (कार्य स्वीकृति के पश्चात् अनुबन्ध हेतु)।</li>
+          <li>निविदादाता को अपने लेटर हेड पैड पर ठेकेदार का नाम, पता, ई&mdash;मेल, मोबाइल नंबर आदि स्वयं द्वारा
+            उल्लेखित कर संलग्न कर अपलोड करना अनिवार्य होगा।</li>
+          <li>एक नान ज्यूडिशियल 100 रूपये के स्टाम्प पेपर पर शपथ पत्र (टी&mdash;6 फारमेट पर) संलग्न करना अनिवार्य होगा।</li>
+          <li>फर्म किसी भी विभाग द्वारा काली सूची में नहीं होनी चाहिए, फर्म द्वारा किसी भी प्रकार का तथ्य छुपाने की
+            स्थिति में उसकी जमानत धनराशि जब्त कर ली जायेगी, 10 रूपये के स्टाम्प पेपर पर शपथ पत्र संलग्न करना अनिवार्य है।</li>
+        </ol>
+        <p style="margin-top:6px;">उपरोक्त क्रम संख्या&mdash;3 में उल्लेखित 1 से लगायत 16 तक के समस्त प्रपत्रों को संलग्न कर अपलोड करना तथा
+        लिफाफे में रखकर कार्य का नाम सहित ठेकेदार/फर्म के साथ हार्ड कापी ई&mdash;निविदा के साथ कार्यालय नगर पंचायत
+        रतसरकलाँ&mdash;बलिया में रखे निविदा बाक्स में समयानुसार डालना अनिवार्य होगा, अन्यथा आपकी बिड कम्पलीट नहीं मानी
+        जायेगी, जिसे निरस्त कर दिया जायेगा।</p>
+      </li>
+
+      <li>पंजिकृत प्रमाण&mdash;पत्र के सम्बन्ध में शासनादेश संख्या&mdash;3890/नौ&mdash;5&mdash;19&mdash;149सा/2019 दिनांक&mdash;20 सितम्बर, 2019 का पालन करना अनिवार्य होगा।</li>
+      <li>शासनादेश सं0&mdash;0145/नौ&mdash;09&mdash;2013 दिनांक 10.12.2013 के द्वारा भवन एवं अन्य सन्निर्माण कर्मचारी अधिनियम के अन्तर्गत ठेकेदारों के पंजीयन एवं श्रमिकों का पंजीयन कराया जाना अनिवार्य होगा। प्रत्येक निविदा कार्य का पंजियन ठेकेदार/संस्था को कार्यादेश प्राप्ति पर श्रम विभाग से कराकर नगर पंचायत रतसरकलाँ&mdash;बलिया में जमा करना होगा।</li>
+      <li>प्रत्येक कार्य के लिए अलग&mdash;अलग निविदा देय अनिवार्य होगा।</li>
+      <li>ई&mdash;निविदा स्वीकृति के पश्चात 7 दिनों के अन्दर निर्धारित स्टाम्प पेपर पर अनुबन्ध कराना अनिवार्य होगा।</li>
+      <li>नगर विकास विभाग/शासन/नगर विभाग द्वारा जारी कार्यों/निविदा के सम्बन्ध में जारी शासनादेश/निर्देशों का पालन करना अनिवार्य होगा।</li>
+      <li>स्थल का निरीक्षण निविदादाता को टेण्डर देने के पूर्व कराना होगा, बाद में किसी प्रकार की आपत्ति मान्य नहीं होगी।</li>
+      <li>टेण्डर रेट (दरें) स्पष्ट अंकित होना चाहिए, उसमें किसी भी प्रकार की ओवर राईटिंग/कटिंग मान्य नहीं होगी।</li>
+      <li>जी0एस0टी0 हेतु निर्धारित दरों का पालन करना अनिवार्य होगा।</li>
+      <li>कार्य प्रारम्भ होने के पहले, कार्य करते समय का तथा कार्य पूर्ण होने के बाद का फोटोग्राफ कार्यालय में जमा करना अनिवार्य है।</li>
+      <li>किसी भी ई&mdash;निविदा को बिना कारण बताये निरस्त करने का अधिकार अधिशासी अधिकारी/सक्षम अधिकारी नगर पंचायत रतसरकलाँ&mdash;बलिया में निहित होगा।</li>
+      <li>ई&mdash;निविदा सूचना में अंकित कार्य में परिवर्तन हो सकता है, नगर पंचायत की आवश्यकता के अनुसार संख्या घटायी या बढ़ायी जा सकती है। जिसके लिए ठेकेदार/फर्म का कोई क्लेम मान्य नहीं होगा।</li>
+      <li>ठेकेदार को निर्धारित समय में आगणन की विशिष्टियों के अनुरूप कार्य पूर्ण कराना अनिवार्य होगा। पूर्ण कार्य होने पर नगर पंचायत द्वारा नियमानुसार भुगतान की कार्यवाही की जायेगी। नगर पंचायत में धन न होने पर ठेकेदार भुगतान हेतु धन की मांग/न्यायालय की शरण नहीं होगी।</li>
+      <li>सर्शत निविदाएं मान्य नहीं होंगी और स्वतः ही निरस्त समझी जायेंगी।</li>
+      <li>शासनादेश संख्या&mdash;423/2024/नौ&mdash;5&mdash;2024/001-Comp.No.1871415-NP नगर विकास अनुभाग&mdash;5 लखनऊ, दि0&mdash;25.11.2024 एवं शासनादेश संख्या&mdash;442/2024/नौ&mdash;5&mdash;2024/001-Comp.No.1871480 नगर विकास अनुभाग&mdash;5 लखनऊ, दि0&mdash;26.11.2024 में उल्लेखित प्राविधानों का पालन किया जाना अनिवार्य होगा।</li>
+      <li>जमानत धनराशि की वापसी शासनादेश में उल्लेखित प्राविधानों के पश्चात कार्य के संतोषजनक पाये जाने के बाद ही वापिस की जायेगी। Security money को वापिस करते समय अभियंता विभाग द्वारा रिफण्ड बाउचर तैयार किया जायेगा जिसमें कार्य के पूर्ण होने की तिथि व भुगतान की अंतिम बिल के साथ निम्न प्रमाण&mdash;पत्र दिये जायेंगे &mdash; &ldquo;अभियन्ता यह प्रमाणित करेगा कि ठेकेदार द्वारा निविदा की समस्त शर्तों के अनुसार कार्य पूर्ण कर लिया गया है तथा कार्य संतोषजनक है, साथ ही ठेकेदार को निविदा के अनुसार यह धनराशि देय हो गयी है&rdquo;, तत्पश्चात लेखा विभाग द्वारा सक्षम अधिकारी द्वारा जमानत धनराशि अवमुक्त की जाएगी।</li>
+      <li>शासनादेश सं0&mdash;अशा पत्र सं0 ए&mdash;2&mdash;64/दस 2012 के अनुसार ठेकेदार/फर्म द्वारा 10 से 15 बिलो दर डालने की दशा में ठेकेदार से 10% बिलो तक 0.5 प्रति 1% कम दर पर तथा 10% से अधिक बिलो दर पर 01% प्रति 1% कम दर पर सिक्योरिटी ली जायेगी।</li>
+      <li>निविदा समिति द्वारा किसी निविदा को अस्वीकृत करने तथा निविदा को बिना कारण बताये निरस्त करने का पूर्ण अधिकार होगा।</li>
+      <li>10 प्रतिशत से कम तक की निविदा हेतु अतिरिक्त जमानत धनराशि (Extra Performance Guarantee) जमा करनी होगी। 10 प्रतिशत से निम्न निविदा डाले जाने पर 0.50 प्रतिशत की दर से तथा 10 प्रतिशत से अधिक निम्न निविदा डाले जाने पर 1.00 प्रतिशत की दर से सिक्योरिटी/परफार्मेन्स गारंटी ली जायेगी।</li>
+      <li>सर्शत निविदा स्वीकार नहीं की जायेगी। निविदा में सम्मिलित कार्यों की अवधि में तर्कसंगत आधार होने पर नियमानुसार वृद्धि की जायेगी। अपूर्ण अथवा सही ढंग से न भरी गयी निविदायें स्वीकार नहीं की जायेंगी।</li>
+      <li>टेक्निकल बिड में धरोहर धनराशि व निविदा शुल्क की जमा रसीद की छायाप्रति ई&mdash;निविदा खुलने से पहले बंद लिफाफे में कार्यालय नगर पंचायत रतसरकलाँ, बलिया में जमा करना अनिवार्य होगा। अन्यथा निविदा अस्वीकृत मानी जायेगी।</li>
+      <li>कार्य निर्धारित समय के अन्दर पूर्ण न होने पर नियमानुसार आर्थिक दण्ड लगाया जायेगा जिस पर कटौती ठेकेदार के बिल से अथवा जमा धनराशि से की जायेगी। यह दण्ड दो सप्ताह तक अधिकतम रू0&mdash;500/&mdash; प्रतिदिन तक हो सकता है। दो सप्ताह के पश्चात कार्य की निविदा निरस्त करने की कार्यवाही की जा सकती है।</li>
+      <li>किसी भी निविदा को बिना कारण बताये निरस्त करने का अधिकार अधोहस्ताक्षरी में निहित होगा।</li>
+      <li>निर्माण से सम्बन्धित कार्यों के लिए तकनीकी, स्टाफ एवं मशीनरी का प्रमाण&mdash;पत्र देना अनिवार्य होगा।</li>
+      <li>किसी भी विवाद की स्थिति में न्यायिक क्षेत्र बलिया होगा।</li>
+      <li>अवकाश की स्थिति में अगला कार्यदिवस मान्य होगा।</li>
+    </ol>
+  </div>
+
+  <div class="signs">
+    <div>
+      <div style="height:52px"></div>
+      अधिशासी अधिकारी<br>नगर पंचायत रतसर कलाँ<br>बलिया
+    </div>
+    <div>
+      <div style="height:52px"></div>
+      अध्यक्ष<br>नगर पंचायत रतसर कलाँ<br>बलिया
+    </div>
+  </div>
+
+</div>
+{% endblock %}
