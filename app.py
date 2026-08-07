@@ -1650,32 +1650,51 @@ def tender_notice_detail(notice_id):
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
 def add_work_to_notice(notice_id):
     conn = db.get_db()
-    work_id = int(request.form["work_id"])
-    work = db.fetchone(conn, "SELECT * FROM works WHERE work_id=?", (work_id,))
-    if not work:
-        conn.close()
-        flash("कार्य नहीं मिला।", "error")
-        return redirect(url_for("tender_notice_detail", notice_id=notice_id))
-
     notice = db.fetchone(conn, "SELECT * FROM tender_notices WHERE notice_id=?", (notice_id,))
-    excl = _excl_gst(work["estimated_amount"])
-    emd = _emd_amount(excl)
-    fee = to_float(request.form.get("tender_fee") or 0) or _tender_fee(excl)
+    if not notice:
+        conn.close()
+        flash("निविदा सूचना नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+
     duration = request.form.get("work_duration") or "3 माह"
+    added = 0
+    for raw in request.form.getlist("work_id"):
+        try:
+            work_id = int(raw)
+        except (TypeError, ValueError):
+            continue
+        work = db.fetchone(conn, "SELECT * FROM works WHERE work_id=?", (work_id,))
+        if not work:
+            continue
 
-    existing = db.fetchone(conn, "SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL ORDER BY tender_id DESC LIMIT 1", (work_id,))
-    if existing:
-        db.run(conn, """UPDATE tenders SET notice_id=?, amount_excl_gst=?, emd_amount=?, tender_fee=?, work_duration=?
-                        WHERE tender_id=?""", (notice_id, excl, emd, fee, duration, existing["tender_id"]))
-    else:
-        db.insert_and_get_id(conn, "tenders", "tender_id",
-            ["work_id", "notice_id", "tender_no", "tender_date", "amount_excl_gst", "emd_amount", "tender_fee", "work_duration"],
-            (work_id, notice_id, notice["notice_no"], notice["notice_date"], excl, emd, fee, duration))
+        excl = _excl_gst(work["estimated_amount"])
+        emd = _emd_amount(excl)
+        fee = _tender_fee(excl)
 
-    db.run(conn, "UPDATE works SET status='TENDERED' WHERE work_id=?", (work_id,))
+        existing = db.fetchone(conn, """SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL
+                                        ORDER BY tender_id DESC LIMIT 1""", (work_id,))
+        if existing:
+            db.run(conn, """UPDATE tenders SET notice_id=?, tender_no=?, tender_date=?, tender_amount=?,
+                            amount_excl_gst=?, emd_amount=?, tender_fee=?, work_duration=?
+                            WHERE tender_id=?""",
+                   (notice_id, notice["notice_no"], notice["notice_date"], excl,
+                    excl, emd, fee, duration, existing["tender_id"]))
+        else:
+            db.insert_and_get_id(conn, "tenders", "tender_id",
+                ["work_id", "notice_id", "tender_no", "tender_date", "tender_amount",
+                 "amount_excl_gst", "emd_amount", "tender_fee", "work_duration"],
+                (work_id, notice_id, notice["notice_no"], notice["notice_date"], excl,
+                 excl, emd, fee, duration))
+
+        db.run(conn, "UPDATE works SET status='TENDERED' WHERE work_id=?", (work_id,))
+        added += 1
+
     conn.commit()
     conn.close()
-    flash(f"कार्य जोड़ा गया — टेंडर धनराशि {fmt_amount(excl)}, EMD {fmt_amount(emd)}, फीस {fmt_amount(fee)}", "success")
+    if added:
+        flash(f"{added} कार्य निविदा में जोड़े गए।", "success")
+    else:
+        flash("कोई कार्य नहीं चुना गया।", "error")
     return redirect(url_for("tender_notice_detail", notice_id=notice_id))
 
 
