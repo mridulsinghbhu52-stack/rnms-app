@@ -22,6 +22,9 @@
   .signs { display:flex; justify-content:space-between; margin-top:60px; text-align:center; }
   @media print {
     .d-print-none { display:none !important; }
+    nav, .navbar, header, footer, .footer, .site-footer, .navbar-brand { display:none !important; }
+    body { background:#fff !important; padding:0 !important; margin:0 !important; }
+    .container, .container-fluid, main { padding:0 !important; margin:0 !important; max-width:100% !important; }
     .nit { max-width:100%; padding:0; border:none !important; box-shadow:none !important; }
     @page { size: A4; margin: 14mm 13mm; }
   }
@@ -88,7 +91,7 @@
       {% set ns = namespace(i=0) %}
       {% for g in groups %}
       <tr><td colspan="6" class="grp">
-        &ldquo;{{ g.scheme_name }}&rdquo; योजना<br>
+        &ldquo;{{ g.scheme_name }}&rdquo;{% if g.scheme_name and not g.scheme_name.endswith('योजना') %} योजना{% endif %}<br>
         <span style="font-weight:400">{{ g.govt_letter_ref or ('शासनादेश ' ~ (g.go_number or '') ~ ' दि0 ' ~ (g.go_date|dmy)) }}</span>
       </td></tr>
       {% for e in g["items"] %}
@@ -113,10 +116,10 @@
     <strong>नियम एवं शर्तें&mdash;</strong>
     <ol>
       <li>ई&mdash;निविदा प्रपत्र का शुल्क कालम&mdash;5 के अनुसार (जो वापस नहीं किया जायेगा) नगर पंचायत रतसरकलाँ के
-        खाता सं0&mdash;<span class="fillin">{{ account.account_no if account else '' }}</span>,
-        IFSC Code&mdash;<span class="fillin">{{ account.ifsc_code if account else '' }}</span>,
-        बैंक&mdash;<span class="fillin">{{ account.bank_name if account else '' }}</span>,
-        शाखा&mdash;<span class="fillin">{{ account.branch_name if account else '' }}</span>
+        खाता सं0&mdash;<span class="fillin">{{ (account.account_no if account else None) or '' }}</span>,
+        IFSC Code&mdash;<span class="fillin">{{ (account.ifsc_code if account else None) or '' }}</span>,
+        बैंक&mdash;<span class="fillin">{{ (account.bank_name if account else None) or '' }}</span>,
+        शाखा&mdash;<span class="fillin">{{ (account.branch_name if account else None) or '' }}</span>
         में जमा/R.T.G.S. करना अनिवार्य होगा और उसकी प्रति ई&mdash;टेण्डर पर अपलोड करना होगा तथा मूल प्रति निविदा के
         साथ जमा करना होगा। अन्यथा निविदा निरस्त समझी जायेगी।</li>
 
