@@ -1,1 +1,91 @@
 
+
+{% extends "base.html" %}
+{% block title %}टैक्स कटौती सूची — {{ tax_label }}{% endblock %}
+{% block content %}
+<style>
+  .tax-sheet { max-width: 1000px; margin: 0 auto; background:#fff; padding: 24px 28px; color:#000;
+               font-family: "Nirmala UI", "Mangal", "Noto Sans Devanagari", sans-serif; }
+  .tax-sheet h5, .tax-sheet h6 { text-align:center; margin-bottom:4px; }
+  .tax-table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:14px; }
+  .tax-table th, .tax-table td { border:1px solid #000; padding:5px 6px; vertical-align:top; }
+  .tax-table th { background:#eee; text-align:center; font-weight:600; }
+  .tax-table td.num { text-align:right; white-space:nowrap; }
+  .tax-table td.c { text-align:center; }
+  .fillin { display:inline-block; min-width:150px; border-bottom:1px dotted #333; padding:0 6px; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .sign-row { display:flex; justify-content:space-between; margin-top:48px; font-size:13px; }
+  @media print {
+    .d-print-none { display:none !important; }
+    body { background:#fff; }
+    .tax-sheet { max-width:100%; padding:0; border:none !important; box-shadow:none !important; }
+    @page { size: A4 landscape; margin: 12mm; }
+  }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:1000px;margin:0 auto;">
+  <a href="{{ url_for('tax_remittance_home', tax_type=tax_type, period_month=period_month) }}" class="btn btn-sm btn-outline-secondary">← वापस जाएं</a>
+  <span class="text-muted small align-self-center">बिंदीदार लाइनों पर क्लिक करके भर सकते हैं, फिर प्रिंट करें</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="tax-sheet border shadow-sm">
+  <h5>नगर पंचायत रतसर कलां, जनपद&mdash;बलिया</h5>
+  <h6>{{ tax_label }} &mdash; कटौती विवरण (माह: {{ period_month }})</h6>
+
+  <table class="tax-table">
+    <thead>
+      <tr>
+        <th style="width:4%">क्र0<br>सं0</th>
+        <th style="width:14%">कार्य कोड</th>
+        <th>कार्य का नाम</th>
+        <th style="width:5%">बिल<br>सं0</th>
+        <th style="width:13%">फर्म / ठेकेदार</th>
+        <th style="width:13%">GST नंबर<br>(GSTIN)</th>
+        <th style="width:10%">PAN</th>
+        <th style="width:11%">भुगतान धनराशि<br>(GST रहित)</th>
+        <th style="width:9%">कटौती राशि<br>(₹)</th>
+        <th style="width:8%">स्थिति</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="c">{{ loop.index }}</td>
+        <td>{{ r.work_code }}</td>
+        <td>{{ r.work_name }}</td>
+        <td class="c">{{ r.bill_no }}</td>
+        <td>{{ r.firm_name }}</td>
+        <td class="c">{{ r.gst_no or '—' }}</td>
+        <td class="c">{{ r.pan_no or '—' }}</td>
+        <td class="num">{{ "%.2f"|format(r.amount_excl_gst or 0) }}</td>
+        <td class="num">{{ "%.2f"|format(r.tax_amount or 0) }}</td>
+        <td class="c">{% if r.remittance_id %}जमा (#{{ r.remittance_id }}){% else %}लंबित{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="c text-muted">इस महीने कोई भुगतान नहीं मिला।</td></tr>
+      {% endfor %}
+      <tr>
+        <td colspan="8" class="num"><strong>कुल योग &mdash;</strong></td>
+        <td class="num"><strong>{{ "%.2f"|format(total) }}</strong></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:14px;font-size:13.5px;">
+    <strong>कुल जमा योग्य धनराशि:</strong> ₹{{ "%.2f"|format(total) }} ({{ total|hword }})
+  </p>
+
+  <p style="font-size:13.5px;line-height:2.2;">
+    चालान/चेक संख्या <span class="fillin" contenteditable="true"></span>
+    &nbsp;&nbsp; दिनांक <span class="fillin" style="min-width:120px" contenteditable="true"></span>
+    &nbsp;&nbsp; बैंक <span class="fillin" style="min-width:200px" contenteditable="true"></span>
+  </p>
+
+  <div class="sign-row">
+    <div>लेखाकार</div>
+    <div>अधिशासी अधिकारी</div>
+  </div>
+</div>
+{% endblock %}
