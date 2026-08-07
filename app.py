@@ -1545,6 +1545,7 @@ def _notice_form_values(form):
         "financial_open_date": form.get("financial_open_date") or None,
         "open_time": form.get("open_time"),
         "technical_open_date": form.get("technical_open_date") or None,
+        "tender_no": form.get("tender_no"),
         "eproc_ref": form.get("eproc_ref"),
         "fee_bank_account_id": int(form["fee_bank_account_id"]) if form.get("fee_bank_account_id") else None,
         "remarks": form.get("remarks"),
