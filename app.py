@@ -1623,10 +1623,15 @@ def tender_notice_detail(notice_id):
                                 WHERE t.notice_id=?
                                 ORDER BY g.go_id, w.work_code""", (notice_id,))
 
-    available = db.fetchall(conn, """SELECT w.work_id, w.work_code, w.work_name, w.estimated_amount
+    available = db.fetchall(conn, """SELECT w.work_id, w.work_code, w.work_name, w.estimated_amount,
+                                         s.scheme_name, g.go_number
                                   FROM works w
-                                  WHERE w.work_id NOT IN (SELECT work_id FROM tenders WHERE notice_id IS NOT NULL)
-                                  ORDER BY w.work_code""")
+                                  LEFT JOIN schemes s ON s.scheme_id=w.scheme_id
+                                  LEFT JOIN go_register g ON g.go_id=w.go_id
+                                  WHERE NOT EXISTS (SELECT 1 FROM tenders t2
+                                                    WHERE t2.work_id = w.work_id
+                                                      AND t2.notice_id IS NOT NULL)
+                                  ORDER BY g.go_number, w.work_code""")
     firms = db.fetchall(conn, "SELECT * FROM firms ORDER BY firm_name")
     schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
     accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
