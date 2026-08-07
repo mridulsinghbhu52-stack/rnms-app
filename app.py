@@ -1686,16 +1686,16 @@ def add_work_to_notice(notice_id):
         existing = db.fetchone(conn, """SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL
                                         ORDER BY tender_id DESC LIMIT 1""", (work_id,))
         if existing:
-            db.run(conn, """UPDATE tenders SET notice_id=?, tender_no=?, tender_date=?, tender_amount=?,
+            db.run(conn, """UPDATE tenders SET notice_id=?, tender_date=?, tender_amount=?,
                             amount_excl_gst=?, emd_amount=?, tender_fee=?, work_duration=?
                             WHERE tender_id=?""",
-                   (notice_id, notice["notice_no"], notice["notice_date"], excl,
+                   (notice_id, notice["notice_date"], excl,
                     excl, emd, fee, duration, existing["tender_id"]))
         else:
             db.insert_and_get_id(conn, "tenders", "tender_id",
-                ["work_id", "notice_id", "tender_no", "tender_date", "tender_amount",
+                ["work_id", "notice_id", "tender_date", "tender_amount",
                  "amount_excl_gst", "emd_amount", "tender_fee", "work_duration"],
-                (work_id, notice_id, notice["notice_no"], notice["notice_date"], excl,
+                (work_id, notice_id, notice["notice_date"], excl,
                  excl, emd, fee, duration))
 
         db.run(conn, "UPDATE works SET status='TENDERED' WHERE work_id=?", (work_id,))
@@ -1708,6 +1708,7 @@ def add_work_to_notice(notice_id):
     else:
         flash("कोई कार्य नहीं चुना गया।", "error")
     return redirect(url_for("tender_notice_detail", notice_id=notice_id))
+
 
 
 @app.route("/tenders/entry/<int:tender_id>/update", methods=["POST"])
