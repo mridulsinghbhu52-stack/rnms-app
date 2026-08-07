@@ -257,24 +257,37 @@
 {% else %}
 <p class="text-muted">इस निविदा में अभी कोई कार्य नहीं जोड़ा गया।</p>
 {% endfor %}
-{% endblock %}
-
 <script>
 (function(){
   var sch = document.getElementById('dScheme');
   var pick = document.getElementById('dGoPick');
   var letter = document.getElementById('dLetterNo');
   if (!sch || !pick || !letter) return;
+
+  var all = [];
+  Array.prototype.forEach.call(pick.options, function(o, i){
+    if (i === 0) return;
+    all.push({ v: o.value, t: o.textContent.trim(), s: o.getAttribute('data-scheme') || '' });
+  });
+  var head = pick.options[0] ? pick.options[0].textContent : '— चुनें —';
+
   function refresh(){
     var v = sch.value;
-    Array.prototype.forEach.call(pick.options, function(o, i){
-      if (i === 0) return;
-      o.hidden = !!(v && o.dataset.scheme && o.dataset.scheme !== v);
+    pick.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = ''; o0.textContent = head;
+    pick.appendChild(o0);
+    all.forEach(function(g){
+      if (v && g.s && g.s !== v) return;
+      var o = document.createElement('option');
+      o.value = g.v; o.textContent = g.t;
+      pick.appendChild(o);
     });
-    pick.selectedIndex = 0;
   }
   sch.addEventListener('change', refresh);
   pick.addEventListener('change', function(){ if (this.value) letter.value = this.value; });
   refresh();
 })();
 </script>
+
+{% endblock %}
