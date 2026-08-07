@@ -269,14 +269,62 @@ def new_opening_balance():
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
 def new_go():
     conn = db.get_db()
-    db.insert_and_get_id(conn, "go_register", "go_id",
-        ["scheme_id", "fy_id", "go_number", "go_date", "subject", "total_sanctioned_amount", "remarks", "created_by"],
-        (int(request.form["scheme_id"]), request.form.get("fy_id") or None, request.form["go_number"],
-         request.form["go_date"], request.form.get("subject"), to_float(request.form["total_sanctioned_amount"]),
-         request.form.get("remarks"), session["user_id"]))
+    scheme_id = int(request.form["scheme_id"])
+    fy_id = int(request.form["fy_id"])
+    scheme = db.fetchone(conn, "SELECT scheme_code FROM schemes WHERE scheme_id=?", (scheme_id,))
+    fy = db.fetchone(conn, "SELECT fy_name FROM financial_years WHERE fy_id=?", (fy_id,))
+    if not scheme or not fy:
+        conn.close()
+        flash("मद अथवा वित्तीय वर्ष नहीं मिला।", "error")
+        return redirect(url_for("finance"))
+
+    row = db.fetchone(conn, """SELECT COALESCE(MAX(go_serial), 0) AS m FROM go_register
+                               WHERE scheme_id=? AND fy_id=?""", (scheme_id, fy_id))
+    serial = int(row["m"] or 0) + 1
+    go_number = f"{scheme['scheme_code']}/{fy['fy_name']}/GO-{serial:02d}"
+
+    try:
+        works_count = int(request.form.get("works_count") or 0)
+    except ValueError:
+        works_count = 0
+
+    go_date = request.form["go_date"]
+    letter_ref = request.form.get("govt_letter_ref")
+
+    go_id = db.insert_and_get_id(conn, "go_register", "go_id",
+        ["scheme_id", "fy_id", "go_number", "go_serial", "works_count", "go_date", "subject",
+         "total_sanctioned_amount", "govt_letter_ref", "remarks", "created_by"],
+        (scheme_id, fy_id, go_number, serial, works_count or None, go_date,
+         request.form.get("subject"), to_float(request.form["total_sanctioned_amount"]),
+         letter_ref, request.form.get("remarks"), session["user_id"]))
+
+    # शासनादेश के साथ ही प्रथम किस्त — भरी हो तो दर्ज कर लें
+    first_amount = to_float(request.form.get("first_amount") or 0)
+    msg = f"शासनादेश दर्ज हुआ — {go_number}"
+    if first_amount:
+        received_date = request.form.get("first_date") or go_date
+        bank_account_id = (int(request.form["first_bank_account_id"])
+                           if request.form.get("first_bank_account_id")
+                           else primary_bank_account(conn, scheme_id))
+        db.insert_and_get_id(conn, "installments", "installment_id",
+            ["go_id", "scheme_id", "installment_no", "amount_received", "received_date",
+             "bank_account_id", "letter_no", "letter_date", "bank_reference_no", "remarks", "created_by"],
+            (go_id, scheme_id, 1, first_amount, received_date, bank_account_id,
+             letter_ref, go_date, request.form.get("first_bank_ref"), "प्रथम किस्त", session["user_id"]))
+        if bank_account_id:
+            post_cashbook_entry(conn, bank_account_id, scheme_id, received_date,
+                                 f"प्रथम किस्त प्राप्त — {go_number}",
+                                 receipt=first_amount, reference_type="INSTALLMENT",
+                                 reference_id=go_id, created_by=session["user_id"])
+        msg += f" · प्रथम किस्त {fmt_amount(first_amount)} दर्ज"
+    if works_count:
+        msg += f" · {works_count} कार्य स्वीकृत"
+
+    conn.commit()
     conn.close()
-    flash("GO दर्ज हुआ।", "success")
+    flash(msg, "success")
     return redirect(url_for("finance"))
+
 
 
 @app.route("/finance/go/<int:go_id>/installments/new", methods=["POST"])
@@ -286,23 +334,28 @@ def new_installment(go_id):
     go = db.fetchone(conn, "SELECT * FROM go_register WHERE go_id=?", (go_id,))
     if not go:
         conn.close()
-        flash("GO नहीं मिला।", "error")
+        flash("शासनादेश नहीं मिला।", "error")
         return redirect(url_for("finance"))
-    count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM installments WHERE go_id=?", (go_id,))["c"]
+    row = db.fetchone(conn, """SELECT COALESCE(MAX(installment_no), 0) AS m
+                               FROM installments WHERE go_id=?""", (go_id,))
+    no = int(row["m"] or 0) + 1
     amount = to_float(request.form["amount_received"])
     bank_account_id = int(request.form["bank_account_id"])
     db.insert_and_get_id(conn, "installments", "installment_id",
         ["go_id", "scheme_id", "installment_no", "amount_received", "received_date",
-         "bank_account_id", "bank_reference_no", "remarks", "created_by"],
-        (go_id, go["scheme_id"], count + 1, amount, request.form["received_date"], bank_account_id,
+         "bank_account_id", "letter_no", "letter_date", "bank_reference_no", "remarks", "created_by"],
+        (go_id, go["scheme_id"], no, amount, request.form["received_date"], bank_account_id,
+         request.form.get("letter_no"), request.form.get("letter_date") or None,
          request.form.get("bank_reference_no"), request.form.get("remarks"), session["user_id"]))
     post_cashbook_entry(conn, bank_account_id, go["scheme_id"], request.form["received_date"],
-                         f"किस्त प्राप्त — GO {go['go_number']} (किस्त {count + 1})",
-                         receipt=amount, reference_type="INSTALLMENT", reference_id=go_id, created_by=session["user_id"])
+                         f"किस्त प्राप्त — {go['go_number']} (किस्त {no})",
+                         receipt=amount, reference_type="INSTALLMENT", reference_id=go_id,
+                         created_by=session["user_id"])
     conn.commit()
     conn.close()
-    flash("किस्त दर्ज हुई।", "success")
+    flash(f"किस्त {no} दर्ज हुई।", "success")
     return redirect(url_for("finance"))
+
 
 
 @app.route("/finance/interest/new", methods=["POST"])
