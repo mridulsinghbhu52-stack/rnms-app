@@ -14,7 +14,14 @@
       </div>
       <div class="col-md-3">
         <label class="form-label small mb-0">पत्रांक</label>
-        <input name="letter_no" class="form-control form-control-sm" placeholder="जैसे 1312/न0पं0र0/2025-26">
+        <input name="letter_no" id="nLetterNo" class="form-control form-control-sm" placeholder="जैसे 1312/न0पं0र0/2025-26">
+        <select id="nGoPick" class="form-select form-select-sm mt-1" style="font-size:12px">
+          <option value="">— योजना चुनने पर शासनादेश की सूची —</option>
+          {% for g in gos %}
+          <option value="{{ g.govt_letter_ref or g.go_number }}" data-scheme="{{ g.scheme_id or '' }}">
+            {{ g.go_number }} — {{ (g.govt_letter_ref or '')[:60] }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="col-md-2">
         <label class="form-label small mb-0">सूचना दिनांक</label>
@@ -34,7 +41,7 @@
 
       <div class="col-md-5">
         <label class="form-label small mb-0">मद (योजना)</label>
-        <select name="scheme_id" class="form-select form-select-sm">
+        <select name="scheme_id" id="nScheme" class="form-select form-select-sm">
           <option value="">— चुनें —</option>
           {% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
         </select>
@@ -115,3 +122,23 @@
   </tbody>
 </table>
 {% endblock %}
+
+<script>
+(function(){
+  var sch = document.getElementById('nScheme');
+  var pick = document.getElementById('nGoPick');
+  var letter = document.getElementById('nLetterNo');
+  if (!sch || !pick || !letter) return;
+  function refresh(){
+    var v = sch.value;
+    Array.prototype.forEach.call(pick.options, function(o, i){
+      if (i === 0) return;
+      o.hidden = !!(v && o.dataset.scheme && o.dataset.scheme !== v);
+    });
+    pick.selectedIndex = 0;
+  }
+  sch.addEventListener('change', refresh);
+  pick.addEventListener('change', function(){ if (this.value) letter.value = this.value; });
+  refresh();
+})();
+</script>
