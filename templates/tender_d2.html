@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}तकनीकी बिड नोटिंग (D2){% endblock %}
+{% block content %}
+<style>
+  .nt { max-width:860px; margin:0 auto; background:#fff; padding:26px 34px; color:#000;
+        font-family:"Nirmala UI","Mangal","Noto Sans Devanagari",serif; font-size:14.5px; line-height:1.9; }
+  .nt p { text-align:justify; }
+  .nt table { width:100%; border-collapse:collapse; font-size:12.5px; line-height:1.5; margin:10px 0 14px; }
+  .nt th, .nt td { border:1px solid #000; padding:4px 6px; text-align:center; vertical-align:middle; }
+  .nt td.desc { text-align:left; }
+  .fillin { display:inline-block; min-width:130px; border-bottom:1px dotted #333; padding:0 5px; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .signs { display:flex; justify-content:space-between; margin-top:56px; text-align:center; font-size:13px; }
+  @media print { .d-print-none{display:none!important} .nt{max-width:100%;padding:0;border:none!important;box-shadow:none!important} @page{size:A4;margin:16mm 14mm} }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:860px;margin:0 auto;">
+  <a href="{{ url_for('tender_notice_detail', notice_id=notice.notice_id) }}" class="btn btn-sm btn-outline-secondary">← वापस</a>
+  <span class="text-muted small align-self-center">बिंदीदार जगहों पर क्लिक करके भर सकते हैं</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="nt border shadow-sm">
+  <p><strong>अधिशासी अधिकारी / अध्यक्ष महोदय,</strong></p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>{{ notice.scheme_name or '' }}</strong> के अन्तर्गत प्राप्त धनराशि से
+  पत्रांक&mdash; <span class="fillin">{{ notice.letter_no or notice.notice_no }}</span> दिनांक
+  <span class="fillin" style="min-width:110px">{{ notice.notice_date|dmy }}</span> द्वारा निविदा में प्रकाशित
+  <strong>{{ rows|length }}</strong> अदद कार्यों का टेक्निकल बिड खोला गया, जिसका विवरण निम्नवत् है:&mdash;</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:7%">क्र0सं0</th>
+        <th style="width:13%">बिड नंबर</th>
+        <th>कार्य का विवरण</th>
+        <th style="width:20%">प्रतिभाग किये निविदादाता का विवरण</th>
+        <th style="width:15%">स्वीकृत / अस्वीकृत निविदादाता</th>
+        <th style="width:15%">अस्वीकृति का कारण</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      {% set work_no = loop.index %}
+      {% set nb = r.bids|length %}
+      {% if nb > 0 %}
+        {% for b in r.bids %}
+        <tr>
+          {% if loop.first %}
+          <td rowspan="{{ nb }}">{{ work_no }}</td>
+          <td rowspan="{{ nb }}" class="small">{{ r.bid_no or '—' }}</td>
+          <td class="desc" rowspan="{{ nb }}">{{ r.work_name }}</td>
+          {% endif %}
+          <td>{{ b.firm_name }}</td>
+          <td>{{ b.technical_status or 'स्वीकृत' }}</td>
+          <td>{{ b.reject_reason or '—' }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td>{{ work_no }}</td>
+          <td class="small">{{ r.bid_no or '—' }}</td>
+          <td class="desc">{{ r.work_name }}</td>
+          <td colspan="3">कोई निविदादाता दर्ज नहीं</td>
+        </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;अतः उपरोक्त विवरण से सहमत हों तो निविदाओं की टेक्निकल बिड की प्रक्रिया पूर्ण करते
+  हुए फाइनेन्शियल बिड खोले जाने हेतु सहमति की दशा में अनुमति प्रदान करने का कष्ट करें।</p>
+
+  <div class="signs">
+    <div><div style="height:46px"></div>अवर अभियन्ता</div>
+    <div><div style="height:46px"></div>अधिशासी अधिकारी</div>
+    <div><div style="height:46px"></div>अध्यक्ष</div>
+  </div>
+</div>
+{% endblock %}
