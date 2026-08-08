@@ -1910,6 +1910,11 @@ def tender_nit_print(notice_id):
                                 WHERE t.notice_id=?
                                 ORDER BY g.go_id, w.work_code""", (notice_id,))
 
+    if not entries:
+        conn.close()
+        flash("इस निविदा में अभी कोई कार्य नहीं जोड़ा गया — पहले कार्य जोड़ें, तभी NIT बनेगा।", "error")
+        return redirect(url_for("tender_notice_detail", notice_id=notice_id))
+        
     account = None
     if notice["fee_bank_account_id"]:
         account = db.fetchone(conn, "SELECT * FROM bank_accounts WHERE account_id=?", (notice["fee_bank_account_id"],))
@@ -2164,6 +2169,48 @@ def set_tender_l1(tender_id):
     conn.close()
     flash("L1 का विवरण सहेजा गया।", "success")
     return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
+
+# ---------------- हर कार्य के अपने M1 / D2 / D3 ----------------
+
+def _one_entry(tender_id):
+    conn = db.get_db()
+    row = db.fetchone(conn, "SELECT notice_id FROM tenders WHERE tender_id=?", (tender_id,))
+    conn.close()
+    if not row or not row["notice_id"]:
+        return None, []
+    notice, rows = _notice_with_entries(row["notice_id"])
+    return notice, [r for r in rows if r["tender_id"] == tender_id]
+
+
+@app.route("/tenders/entry/<int:tender_id>/print/m1")
+@login_required
+def tender_entry_print_m1(tender_id):
+    notice, rows = _one_entry(tender_id)
+    if not rows:
+        flash("प्रविष्टि नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_m1.html", notice=notice, rows=rows, doc_cols=M1_DOC_COLUMNS)
+
+
+@app.route("/tenders/entry/<int:tender_id>/print/d2")
+@login_required
+def tender_entry_print_d2(tender_id):
+    notice, rows = _one_entry(tender_id)
+    if not rows:
+        flash("प्रविष्टि नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_d2.html", notice=notice, rows=rows)
+
+
+@app.route("/tenders/entry/<int:tender_id>/print/d3")
+@login_required
+def tender_entry_print_d3(tender_id):
+    notice, rows = _one_entry(tender_id)
+    if not rows:
+        flash("प्रविष्टि नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_d3.html", notice=notice, rows=rows)
+
 
 
 if __name__ == "__main__":
