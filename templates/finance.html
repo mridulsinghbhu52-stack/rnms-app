@@ -33,32 +33,69 @@
     <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#c2">शासनादेश/GO रजिस्टर एवं किस्तें</button></h2>
     <div id="c2" class="accordion-collapse collapse" data-bs-parent="#acc">
       <div class="accordion-body">
-        <h6>नया GO</h6>
+        <h6>नया शासनादेश</h6>
         <form method="POST" action="{{ url_for('new_go') }}" class="row g-2 mb-3">
-          <div class="col-md-3"><select name="scheme_id" class="form-select form-select-sm" required>
-            <option value="">मद चुनें</option>{% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
-          </select></div>
-          <div class="col-md-2"><input name="go_number" class="form-control form-control-sm" placeholder="GO संख्या" required></div>
-          <div class="col-md-2"><input type="date" name="go_date" class="form-control form-control-sm" required></div>
-          <div class="col-md-3"><input name="subject" class="form-control form-control-sm" placeholder="विषय"></div>
-          <div class="col-md-2"><input name="total_sanctioned_amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="स्वीकृत राशि" required></div>
-          <div class="col-md-2 mt-2"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">GO दर्ज करें</button></div>
+          <div class="col-md-4"><label class="form-label small mb-0">मद (योजना)</label>
+            <select name="scheme_id" class="form-select form-select-sm" required>
+              <option value="">— चुनें —</option>{% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
+            </select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">वित्तीय वर्ष</label>
+            <select name="fy_id" class="form-select form-select-sm" required>
+              <option value="">— चुनें —</option>{% for f in fys %}<option value="{{ f.fy_id }}">{{ f.fy_name }}</option>{% endfor %}
+            </select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">शासनादेश दिनांक</label>
+            <input type="date" name="go_date" class="form-control form-control-sm" required></div>
+          <div class="col-md-2"><label class="form-label small mb-0">स्वीकृत धनराशि</label>
+            <input name="total_sanctioned_amount" type="number" step="0.01" class="form-control form-control-sm" required></div>
+          <div class="col-md-2"><label class="form-label small mb-0">स्वीकृत कार्य (संख्या)</label>
+            <input name="works_count" type="number" min="0" class="form-control form-control-sm" placeholder="जैसे 12"></div>
+
+          <div class="col-md-6"><label class="form-label small mb-0">शासन के पत्र की पूरी संख्या
+              <span class="text-muted" style="font-size:11px">(NIT में छपेगी)</span></label>
+            <input name="govt_letter_ref" class="form-control form-control-sm"
+                   placeholder="जैसे 2531/9-8-2024-1681633"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">प्रथम किस्त धनराशि</label>
+            <input name="first_amount" type="number" step="0.01" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">किस्त प्राप्ति दिनांक</label>
+            <input type="date" name="first_date" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">बैंक खाता</label>
+            <select name="first_bank_account_id" class="form-select form-select-sm">
+              <option value="">— स्वतः —</option>{% for b in bank_accounts %}<option value="{{ b.account_id }}">{{ b.account_no }} — {{ b.bank_name }}</option>{% endfor %}
+            </select></div>
+
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">शासनादेश दर्ज करें</button></div>
+
+          <div class="col-12"><small class="text-muted">
+            शासनादेश संख्या अपने-आप बनेगी &mdash; <code>मद/वित्तीय वर्ष/GO-01</code>, फिर GO-02 …
+            उसी मद के उसी वर्ष में क्रम से &middot;
+            स्वीकृत कार्यों की संख्या भर देने पर कार्य वाले खंड में उतनी ही पंक्तियाँ अपने-आप खुलेंगी &middot;
+            प्रथम किस्त यहीं भर दें, वह कैशबुक में भी चढ़ जाएगी &mdash; आगे की किस्तें नीचे तालिका में,
+            अपने पत्रांक व दिनांक के साथ।</small></div>
         </form>
         <table class="table table-sm">
-          <thead><tr><th>मद</th><th>GO नं.</th><th>दिनांक</th><th>स्वीकृत राशि</th><th>प्राप्त</th><th>किस्त जोड़ें</th><th>दस्तावेज़</th></tr></thead>
+          <thead><tr><th>मद</th><th>शासनादेश</th><th>दिनांक</th><th class="text-end">स्वीकृत राशि</th><th class="text-end">प्राप्त</th><th>अगली किस्त जोड़ें</th><th>दस्तावेज़</th></tr></thead>
           <tbody>
           {% for g in gos %}
           <tr>
-            <td>{{ g.scheme_name }}</td><td>{{ g.go_number }}</td><td>{{ g.go_date }}</td>
-            <td>{{ g.total_sanctioned_amount|amt }}</td><td>{{ g.received|amt }}</td>
+            <td>{{ g.scheme_name }}</td>
+            <td>{{ g.go_number }}
+              {% if g.govt_letter_ref %}<br><span class="text-muted" style="font-size:11px">{{ g.govt_letter_ref }}</span>{% endif %}
+              {% if g.works_count %}<br><span class="text-muted" style="font-size:11px">{{ g.works_count }} कार्य स्वीकृत</span>{% endif %}
+            </td>
+            <td>{{ g.go_date }}</td>
+            <td class="text-end">{{ g.total_sanctioned_amount|amt }}</td>
+            <td class="text-end">{{ g.received|amt }}</td>
             <td>
-              <form method="POST" action="{{ url_for('new_installment', go_id=g.go_id) }}" class="d-flex gap-1">
-                <input name="amount_received" type="number" step="0.01" class="form-control form-control-sm" placeholder="राशि" style="width:100px" required>
-                <input type="date" name="received_date" class="form-control form-control-sm" style="width:140px" required>
-                <select name="bank_account_id" class="form-select form-select-sm" style="width:140px" required>
+              <form method="POST" action="{{ url_for('new_installment', go_id=g.go_id) }}" class="row g-1">
+                <div class="col-6"><input name="letter_no" class="form-control form-control-sm" placeholder="पत्रांक"></div>
+                <div class="col-6"><input type="date" name="letter_date" class="form-control form-control-sm" title="पत्र दिनांक"></div>
+                <div class="col-4"><input name="amount_received" type="number" step="0.01" class="form-control form-control-sm" placeholder="राशि" required></div>
+                <div class="col-4"><input type="date" name="received_date" class="form-control form-control-sm" title="प्राप्ति दिनांक" required></div>
+                <div class="col-3"><select name="bank_account_id" class="form-select form-select-sm" required>
                   {% for b in bank_accounts %}<option value="{{ b.account_id }}">{{ b.account_no }}</option>{% endfor %}
-                </select>
-                <button class="btn btn-sm btn-outline-success">+</button>
+                </select></div>
+                <div class="col-1"><button class="btn btn-sm btn-outline-success w-100">+</button></div>
               </form>
             </td>
             <td><a href="{{ url_for('manage_documents', related_type='GO', related_id=g.go_id) }}" class="btn btn-sm btn-outline-secondary">📎</a></td>
