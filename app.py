@@ -1689,11 +1689,20 @@ def tender_notices():
                                     ORDER BY ba.account_id""")
     gos = db.fetchall(conn, """SELECT go_id, scheme_id, go_number, go_date, govt_letter_ref
                                FROM go_register ORDER BY scheme_id, go_number""")
-    gos = db.fetchall(conn, """SELECT go_id, scheme_id, go_number, go_date, govt_letter_ref
-                               FROM go_register ORDER BY scheme_id, go_number""")
+    available = db.fetchall(conn, """SELECT w.work_id, w.work_code, w.work_name, w.estimated_amount,
+                                         w.scheme_id, w.go_id, s.scheme_name, g.go_number
+                                  FROM works w
+                                  LEFT JOIN schemes s ON s.scheme_id=w.scheme_id
+                                  LEFT JOIN go_register g ON g.go_id=w.go_id
+                                  WHERE NOT EXISTS (SELECT 1 FROM tenders t2
+                                                    WHERE t2.work_id = w.work_id
+                                                      AND t2.notice_id IS NOT NULL)
+                                  ORDER BY g.go_number, w.work_code""")
     conn.close()
-    return render_template("tenders_list.html", rows=rows, schemes=schemes, accounts=accounts,gos=gos,
+    return render_template("tenders_list.html", rows=rows, schemes=schemes, accounts=accounts,
+                            gos=gos, available=available,
                             status_labels=dict(NOTICE_STATUS_LABELS))
+
 
 
 @app.route("/tenders/new", methods=["POST"])
