@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}कार्यादेश{% endblock %}
+{% block content %}
+<style>
+  .wo { max-width:860px; margin:0 auto; background:#fff; padding:28px 36px; color:#000;
+        font-family:"Nirmala UI","Mangal","Noto Sans Devanagari",serif; font-size:14.5px; line-height:2.0; }
+  .wo h5 { text-align:center; font-weight:700; margin-bottom:8px; }
+  .wo .title { text-align:center; font-weight:700; text-decoration:underline; margin:12px 0 16px; }
+  .wo p { text-align:justify; margin-bottom:10px; }
+  .wo table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0 14px; }
+  .wo th, .wo td { border:1px solid #000; padding:5px 7px; }
+  .wo th { width:34%; text-align:left; font-weight:600; background:#f5f5f5; }
+  .fillin { display:inline-block; min-width:120px; border-bottom:1px dotted #333; padding:0 5px; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .cc { margin-top:34px; font-size:13px; }
+  .sign { text-align:right; margin-top:52px; font-size:13.5px; }
+  @media print { .d-print-none{display:none!important} .wo{max-width:100%;padding:0;border:none!important;box-shadow:none!important} @page{size:A4;margin:16mm 14mm} }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:860px;margin:0 auto;">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">← वापस</a>
+  <span class="text-muted small align-self-center">बिंदीदार जगहें भरी जा सकती हैं, फिर प्रिंट करें</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="wo border shadow-sm">
+  <h5>कार्यालय नगर पंचायत रतसर कलाँ, जनपद&mdash;बलिया</h5>
+
+  <div style="display:flex;justify-content:space-between;">
+    <div>पत्रांक:&mdash; <span class="fillin">{{ e.wo_no or '' }}</span></div>
+    <div>दिनांक:&mdash; <span class="fillin" style="min-width:120px">{{ e.wo_date|dmy }}</span></div>
+  </div>
+
+  <div class="title">कार्यादेश (Work Order)</div>
+
+  <p>सेवा में,<br>
+  <strong>{{ e.l1_firm_name or '—' }}</strong>{% if e.proprietor_name %}<br>(प्रोपराइटर&mdash;{{ e.proprietor_name }}){% endif %}<br>
+  <span class="fillin" style="min-width:380px"></span></p>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;निविदा सूचना संख्या <strong>{{ e.notice_no or '' }}</strong> दिनांक
+  <strong>{{ e.notice_date|dmy }}</strong> के क्रम में, आपके द्वारा प्रस्तुत निविदा न्यूनतम (L1) पाये जाने पर
+  सक्षम स्तर से स्वीकृति प्राप्त होने तथा दिनांक <strong>{{ e.agreement_date|dmy }}</strong> को अनुबन्ध
+  {% if e.agreement_no %}(अनुबन्ध संख्या {{ e.agreement_no }}){% endif %} सम्पादित होने के उपरान्त,
+  निम्नलिखित कार्य आपको आवंटित करते हुए एतद्द्वारा <strong>कार्यादेश निर्गत किया जाता है</strong>&mdash;</p>
+
+  <table>
+    <tr><th>योजना (मद)</th><td>{{ e.scheme_name or '' }}</td></tr>
+    <tr><th>टेंडर संख्या / बिड नंबर</th><td>{{ e.notice_tender_no or '—' }} &nbsp; / &nbsp; <strong>{{ e.bid_no or '—' }}</strong></td></tr>
+    <tr><th>कार्य कोड</th><td>{{ e.work_code or '' }}</td></tr>
+    <tr><th>कार्य का विवरण</th><td>{{ e.work_name }}</td></tr>
+    <tr><th>स्वीकृत धनराशि (GST सहित)</th><td>{{ '%.2f'|format(e.estimated_amount or 0) }}</td></tr>
+    <tr><th>स्वीकृत निविदा दर (L1)</th><td><strong>{{ '%.2f'|format(e.l1_amount or 0) }}</strong>
+        {% if e.l1_amount %}({{ e.l1_amount|hword }}){% endif %}</td></tr>
+    <tr><th>कार्यावधि</th><td><strong>{{ e.work_duration or '' }}</strong> (कार्यादेश की तिथि से)</td></tr>
+    <tr><th>कार्य प्रारम्भ की तिथि</th><td><span class="fillin" style="min-width:180px"></span></td></tr>
+    <tr><th>कार्य पूर्ण करने की अंतिम तिथि</th><td><span class="fillin" style="min-width:180px"></span></td></tr>
+  </table>
+
+  <p><strong>शर्तें&mdash;</strong></p>
+  <ol style="font-size:13.5px;">
+    <li>कार्य निविदा सूचना संख्या {{ e.notice_no or '' }} की समस्त शर्तों तथा दिनांक {{ e.agreement_date|dmy }}
+      को सम्पादित अनुबन्ध के अनुसार कराया जायेगा।</li>
+    <li>कार्य आगणन की विशिष्टियों एवं तकनीकी मानकों के अनुरूप, निर्धारित कार्यावधि के भीतर पूर्ण करना अनिवार्य होगा।</li>
+    <li>कार्य प्रारम्भ से पूर्व, कार्य के दौरान तथा कार्य पूर्ण होने के पश्चात की फोटोग्राफ कार्यालय में जमा करना
+      अनिवार्य होगा।</li>
+    <li>कार्य की माप पुस्तिका (MB) में माप अंकित कराकर, सक्षम अभियन्ता से सत्यापन के उपरान्त ही बिल प्रस्तुत किया
+      जायेगा।</li>
+    <li>भुगतान से नियमानुसार जी0एस0टी0 (CGST 1% एवं SGST 1%), आयकर 2% तथा लागू होने पर श्रम उपकर 1% की कटौती की
+      जायेगी।</li>
+    <li>श्रम विभाग से कार्य का पंजीयन कराकर उसकी प्रति कार्यालय में जमा करना अनिवार्य होगा।</li>
+    <li>निर्धारित समय में कार्य पूर्ण न होने पर नियमानुसार आर्थिक दण्ड लगाया जायेगा।</li>
+    <li>कार्य की गुणवत्ता असंतोषजनक पाये जाने पर उसे अपने व्यय पर ठीक कराना होगा।</li>
+  </ol>
+
+  <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;अतः उपरोक्त कार्य को तत्काल प्रारम्भ कर निर्धारित अवधि में पूर्ण करना सुनिश्चित करें।</p>
+
+  <div class="sign">
+    <div style="height:56px"></div>
+    अधिशासी अधिकारी<br>नगर पंचायत रतसर कलाँ<br>जनपद&mdash;बलिया
+  </div>
+
+  <div class="cc">
+    <strong>पृष्ठांकन संख्या&mdash; <span class="fillin">{{ e.wo_no or '' }}</span> &nbsp; दिनांक&mdash;
+      <span class="fillin" style="min-width:120px">{{ e.wo_date|dmy }}</span></strong>
+    <p style="margin-top:6px;">प्रतिलिपि निम्नलिखित को सूचनार्थ एवं आवश्यक कार्यवाही हेतु प्रेषित&mdash;</p>
+    <ol style="font-size:13px;">
+      <li><strong>अवर अभियन्ता, नगर पंचायत रतसर कलाँ, बलिया</strong> &mdash; कार्य की गुणवत्ता, माप एवं
+        पर्यवेक्षण हेतु।</li>
+      <li>लेखाकार, नगर पंचायत रतसर कलाँ, बलिया &mdash; अभिलेख हेतु।</li>
+      <li>कार्यालय पत्रावली।</li>
+    </ol>
+    <div class="sign">
+      <div style="height:52px"></div>
+      अधिशासी अधिकारी<br>नगर पंचायत रतसर कलाँ<br>जनपद&mdash;बलिया
+    </div>
+  </div>
+</div>
+{% endblock %}
