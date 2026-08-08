@@ -1735,8 +1735,10 @@ def tender_notice_detail(notice_id):
         flash("निविदा सूचना नहीं मिली।", "error")
         return redirect(url_for("tender_notices"))
 
-    entries = db.fetchall(conn, """SELECT t.*, w.work_code, w.work_name, w.estimated_amount,
-                                       w.status AS work_status, w.go_id, f.firm_name,
+    entries_raw = db.fetchall(conn, """SELECT t.*, w.work_code, w.work_name, w.estimated_amount,
+                                       w.status AS work_status, w.go_id, w.scheme_id,
+                                       f.firm_name, f.proprietor_name, f.gst_no, f.pan_no,
+                                       f.contact_no, f.email, f.address,
                                        g.go_number, g.go_date, g.govt_letter_ref, s2.scheme_name
                                 FROM tenders t
                                 JOIN works w ON w.work_id=t.work_id
@@ -1745,9 +1747,15 @@ def tender_notice_detail(notice_id):
                                 LEFT JOIN firms f ON f.firm_id=t.l1_firm_id
                                 WHERE t.notice_id=?
                                 ORDER BY g.go_id, w.work_code""", (notice_id,))
+    entries = []
+    for row_e in entries_raw:
+        item = dict(row_e)
+        item["bids"] = _rank_bids(db.fetchall(conn,
+            "SELECT * FROM tender_bids WHERE tender_id=? ORDER BY bid_id", (row_e["tender_id"],)))
+        entries.append(item)
 
     available = db.fetchall(conn, """SELECT w.work_id, w.work_code, w.work_name, w.estimated_amount,
-                                         s.scheme_name, g.go_number
+                                         w.scheme_id, w.go_id, s.scheme_name, g.go_number
                                   FROM works w
                                   LEFT JOIN schemes s ON s.scheme_id=w.scheme_id
                                   LEFT JOIN go_register g ON g.go_id=w.go_id
@@ -1755,6 +1763,7 @@ def tender_notice_detail(notice_id):
                                                     WHERE t2.work_id = w.work_id
                                                       AND t2.notice_id IS NOT NULL)
                                   ORDER BY g.go_number, w.work_code""")
+
     firms = db.fetchall(conn, "SELECT * FROM firms ORDER BY firm_name")
     schemes = db.fetchall(conn, "SELECT * FROM schemes ORDER BY scheme_name")
     accounts = db.fetchall(conn, """SELECT ba.*, s.scheme_name FROM bank_accounts ba
@@ -1987,16 +1996,21 @@ def _notice_with_entries(notice_id, with_bids=True):
 def add_tender_bid(tender_id):
     conn = db.get_db()
     row = db.fetchone(conn, "SELECT notice_id FROM tenders WHERE tender_id=?", (tender_id,))
-    names = request.form.get("firm_names", "")
+    names = []
+    for chunk in request.form.getlist("firm_names"):
+        for nm in (chunk or "").replace("\r", "").split("\n"):
+            if nm.strip():
+                names.append(nm.strip())
     added = 0
-    for nm in [n.strip() for n in names.replace("\r", "").split("\n") if n.strip()]:
+    for nm in names:
         db.insert_and_get_id(conn, "tender_bids", "bid_id",
             ["tender_id", "firm_name", "technical_status"], (tender_id, nm, "स्वीकृत"))
         added += 1
     conn.commit()
     nid = row["notice_id"] if row else None
     conn.close()
-    flash(f"{added} फर्म जोड़ी गईं।", "success")
+    flash(f"{added} फर्म जोड़ी गईं।" if added else "कोई नाम नहीं भरा गया।",
+          "success" if added else "error")
     return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
 
 
