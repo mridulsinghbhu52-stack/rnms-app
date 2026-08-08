@@ -6,42 +6,196 @@
 <div class="card shadow-sm mb-4">
   <div class="card-header">नया कार्य प्रस्ताव</div>
   <div class="card-body">
-    <form method="POST" action="{{ url_for('new_work') }}" class="row g-2">
-      <div class="col-md-3"><select name="scheme_id" class="form-select form-select-sm" required>
-        <option value="">मद चुनें</option>{% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
-      </select></div>
-      <div class="col-md-2"><select name="ward_id" class="form-select form-select-sm">
-        <option value="">वार्ड</option>{% for w in wards %}<option value="{{ w.ward_id }}">{{ w.ward_no }} — {{ w.ward_name }}</option>{% endfor %}
-      </select></div>
-      <div class="col-md-2"><select name="fy_id" class="form-select form-select-sm" required>
-        <option value="">वित्तीय वर्ष</option>{% for f in fys %}<option value="{{ f.fy_id }}">{{ f.fy_name }}</option>{% endfor %}
-      </select></div>
-      <div class="col-md-2"><select name="asset_type_id" class="form-select form-select-sm">
-        <option value="">परिसंपत्ति प्रकार</option>{% for a in asset_types %}<option value="{{ a.asset_type_id }}">{{ a.asset_type_name }}</option>{% endfor %}
-      </select></div>
-      <div class="col-md-3"><select name="work_source" class="form-select form-select-sm">
-        <option value="NEW">नया कार्य</option><option value="LEGACY">पुराना (Legacy) कार्य</option>
-      </select></div>
-      <div class="col-md-6"><input name="work_name" class="form-control form-control-sm" placeholder="कार्य का नाम" required></div>
-      <div class="col-md-3"><input name="estimated_amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="अनुमानित धनराशि" required></div>
-      <div class="col-md-2 form-check mt-2"><input type="checkbox" name="is_tendered" class="form-check-input" checked><label class="form-check-label small">टेंडर आधारित</label></div>
-      <div class="col-md-1"><button class="btn btn-sm text-white w-100" style="background:#2f6f4f;">जोड़ें</button></div>
+    <form method="POST" action="{{ url_for('new_work') }}">
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">मद (योजना)</label>
+          <select id="wScheme" class="form-select form-select-sm">
+            <option value="">— मद चुनें —</option>
+            {% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small mb-0">शासनादेश (GO) — इसी से कार्य कोड बनेगा</label>
+          <select name="go_id" id="wGo" class="form-select form-select-sm" required>
+            <option value="">— पहले मद चुनें —</option>
+            {% for g in gos %}
+            <option value="{{ g.go_id }}" data-scheme="{{ g.scheme_id or '' }}"
+                    data-total="{{ g.works_count or 0 }}" data-done="{{ g.done_count or 0 }}">
+              {{ g.go_number }} · दि0 {{ g.go_date or '—' }} · {{ g.total_sanctioned_amount|amt }}{% if g.works_count %} · {{ g.done_count }}/{{ g.works_count }} कार्य दर्ज{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-0">कार्य का स्रोत</label>
+          <select name="work_source" class="form-select form-select-sm">
+            <option value="NEW">नया कार्य</option><option value="LEGACY">पुराना (Legacy)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="goNote" class="alert alert-light border py-2 px-3 small mb-2 d-none"></div>
+
+      <div id="rowsWrap" class="d-none">
+        <table class="table table-sm align-middle mb-2">
+          <thead class="table-light">
+            <tr>
+              <th style="width:42px">क्र0</th>
+              <th>कार्य का नाम</th>
+              <th style="width:150px">वार्ड</th>
+              <th style="width:150px">परिसंपत्ति प्रकार</th>
+              <th style="width:140px">अनुमानित धनराशि</th>
+              <th style="width:110px">टेंडर</th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody"></tbody>
+        </table>
+
+        <div class="d-flex justify-content-between align-items-center">
+          <button type="button" id="addRow" class="btn btn-sm btn-outline-secondary">+ एक और पंक्ति</button>
+          <div class="small text-muted">कुल अनुमानित धनराशि: <strong id="sumAmt">0.00</strong></div>
+          <button class="btn btn-sm text-white" style="background:#2f6f4f;min-width:140px;">सभी कार्य जोड़ें</button>
+        </div>
+
+        <small class="text-muted d-block mt-2">कार्य कोड अपने-आप बनेगा &mdash;
+          <code>मद/वित्तीय&nbsp;वर्ष/GO-01/S-12/W-013</code> &nbsp;·&nbsp;
+          <strong>S</strong> = उसी शासनादेश का 12वाँ कार्य &nbsp;·&nbsp;
+          <strong>W</strong> = उस वित्तीय वर्ष में सभी योजनाओं को मिलाकर 13वाँ कार्य।
+          जिस पंक्ति में कार्य का नाम खाली रहेगा वह छोड़ दी जाएगी।</small>
+      </div>
     </form>
   </div>
 </div>
 
 <table class="table table-sm table-hover bg-white shadow-sm">
-  <thead><tr><th>Work ID</th><th>मद</th><th>वार्ड</th><th>कार्य का नाम</th><th>अनुमानित राशि</th><th>स्थिति</th></tr></thead>
+  <thead><tr>
+    <th style="width:235px">कार्य कोड</th><th>मद</th><th style="width:150px">शासनादेश</th>
+    <th style="width:70px">वार्ड</th><th>कार्य का नाम</th>
+    <th style="width:120px" class="text-end">अनुमानित राशि</th><th style="width:110px">स्थिति</th>
+  </tr></thead>
   <tbody>
     {% for w in works %}
     <tr onclick="window.location='{{ url_for('work_detail', work_id=w.work_id) }}'" style="cursor:pointer;">
-      <td>{{ w.work_code }}</td><td>{{ w.scheme_name }}</td><td>{{ w.ward_name or '—' }}</td>
-      <td>{{ w.work_name }}</td><td>{{ w.estimated_amount|amt }}</td>
+      <td class="small">{{ w.work_code }}</td>
+      <td>{{ w.scheme_name }}</td>
+      <td class="small text-muted">{{ w.go_number or '—' }}</td>
+      <td>{{ w.ward_name or '—' }}</td>
+      <td>{{ w.work_name }}</td>
+      <td class="text-end">{{ w.estimated_amount|amt }}</td>
       <td><span class="badge bg-secondary badge-status">{{ w.status }}</span></td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="text-center text-muted">अभी कोई कार्य दर्ज नहीं है।</td></tr>
+    <tr><td colspan="7" class="text-center text-muted">अभी कोई कार्य दर्ज नहीं है।</td></tr>
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+(function(){
+  var WARDS  = [{% for w in wards %}{v:"{{ w.ward_id }}",t:"{{ w.ward_no }} — {{ w.ward_name }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+  var ASSETS = [{% for a in asset_types %}{v:"{{ a.asset_type_id }}",t:"{{ a.asset_type_name }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+
+  var sch = document.getElementById('wScheme');
+  var go = document.getElementById('wGo');
+  var note = document.getElementById('goNote');
+  var wrap = document.getElementById('rowsWrap');
+  var body = document.getElementById('rowsBody');
+  var addBtn = document.getElementById('addRow');
+  var sumEl = document.getElementById('sumAmt');
+  if (!sch || !go) return;
+
+  var all = [];
+  Array.prototype.forEach.call(go.options, function(o, i){
+    if (i === 0) return;
+    all.push({ v:o.value, t:o.textContent.trim(), s:o.getAttribute('data-scheme')||'',
+               total:parseInt(o.getAttribute('data-total')||'0',10),
+               done:parseInt(o.getAttribute('data-done')||'0',10) });
+  });
+
+  function opts(list, ph){
+    var h = '<option value="">' + ph + '</option>';
+    list.forEach(function(x){ h += '<option value="'+x.v+'">'+x.t+'</option>'; });
+    return h;
+  }
+
+  function recalc(){
+    var t = 0;
+    body.querySelectorAll('input[name="estimated_amount"]').forEach(function(inp){
+      t += parseFloat(inp.value || 0) || 0;
+    });
+    sumEl.textContent = t.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function addRow(){
+    var n = body.children.length + 1;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="text-muted small">' + n + '</td>' +
+      '<td><input name="work_name" class="form-control form-control-sm"></td>' +
+      '<td><select name="ward_id" class="form-select form-select-sm">' + opts(WARDS, '—') + '</select></td>' +
+      '<td><select name="asset_type_id" class="form-select form-select-sm">' + opts(ASSETS, '—') + '</select></td>' +
+      '<td><input name="estimated_amount" type="number" step="0.01" class="form-control form-control-sm"></td>' +
+      '<td><select name="is_tendered" class="form-select form-select-sm">' +
+        '<option value="1">टेंडर से</option><option value="0">बिना टेंडर</option></select></td>';
+    body.appendChild(tr);
+    tr.querySelector('input[name="estimated_amount"]').addEventListener('input', recalc);
+  }
+  addBtn.addEventListener('click', addRow);
+
+  function buildRows(g){
+    body.innerHTML = '';
+    var remaining = (g.total || 0) - (g.done || 0);
+    if (remaining < 1) remaining = 1;
+    if (remaining > 60) remaining = 60;
+    for (var i = 0; i < remaining; i++) addRow();
+    recalc();
+  }
+
+  function onGoChange(){
+    var opt = go.options[go.selectedIndex];
+    if (!go.value || !opt) { wrap.classList.add('d-none'); note.classList.add('d-none'); return; }
+    var g = { total: parseInt(opt.getAttribute('data-total')||'0',10),
+              done:  parseInt(opt.getAttribute('data-done') ||'0',10) };
+    if (g.total) {
+      note.classList.remove('d-none');
+      note.innerHTML = 'इस शासनादेश से <strong>' + g.total + '</strong> कार्य स्वीकृत हैं, ' +
+                       '<strong>' + g.done + '</strong> दर्ज हो चुके — नीचे <strong>' +
+                       Math.max(g.total - g.done, 0) + '</strong> पंक्तियाँ खुली हैं।';
+    } else {
+      note.classList.remove('d-none');
+      note.innerHTML = 'इस शासनादेश में स्वीकृत कार्यों की संख्या दर्ज नहीं है — ' +
+                       'नीचे एक पंक्ति खुली है, ज़रूरत हो तो "+ एक और पंक्ति" से बढ़ा लें।';
+    }
+    wrap.classList.remove('d-none');
+    buildRows(g);
+  }
+  go.addEventListener('change', onGoChange);
+
+  function refreshGos(){
+    var v = sch.value;
+    go.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = v ? '— शासनादेश चुनें —' : '— पहले मद चुनें —';
+    go.appendChild(o0);
+    var n = 0;
+    if (v) {
+      all.forEach(function(g){
+        if (g.s !== v) return;
+        var o = document.createElement('option');
+        o.value = g.v; o.textContent = g.t;
+        o.setAttribute('data-total', g.total); o.setAttribute('data-done', g.done);
+        go.appendChild(o); n++;
+      });
+      if (n === 0) o0.textContent = '— इस मद का कोई शासनादेश दर्ज नहीं —';
+    }
+    wrap.classList.add('d-none');
+    note.classList.add('d-none');
+  }
+  sch.addEventListener('change', refreshGos);
+  refreshGos();
+})();
+</script>
 {% endblock %}
