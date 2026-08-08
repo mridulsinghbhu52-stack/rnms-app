@@ -1919,6 +1919,197 @@ def tender_nit_print(notice_id):
                             letter_refs=letter_refs, scheme_names=scheme_names,
                             emd_percent=int(EMD_PERCENT * 100), total_works=len(entries))
 
+# =============================================================================
+# app.py के सबसे नीचे (if __name__ == "__main__": से पहले) पेस्ट करें
+# भाग लेने वाली फर्में + M1 / D2 / D3 / एग्रीमेंट / कार्यादेश के प्रिंट
+# =============================================================================
+
+M1_DOC_COLUMNS = ["निविदा शुल्क", "जमानत धनराशि", "हैसियत प्रमाण पत्र", "चरित्र प्रमाण पत्र",
+                  "पंजीकरण प्रमाण पत्र", "पैन कार्ड", "आधार कार्ड", "जी0एस0टी0 प्रमाण पत्र",
+                  "श्रम विभाग द्वारा जारी प्रमाण पत्र", "आई.टी.आर.", "टी–6", "बैलेन्स शीट",
+                  "अनुभव", "सादा स्टाम्प", "फर्म का पैड", "दस स्टाम्प"]
+
+RANK_LABELS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
+               "L11", "L12", "L13", "L14", "L15"]
+
+
+def _rank_bids(bids):
+    """तकनीकी रूप से स्वीकृत फर्मों को बिड की रक़म से रैंक दें — सबसे कम = L1"""
+    out = [dict(b) for b in bids]
+    priced = [b for b in out if b.get("technical_status") == "स्वीकृत" and b.get("bid_amount")]
+    priced.sort(key=lambda b: float(b["bid_amount"]))
+    for i, b in enumerate(priced):
+        b["rank_label"] = RANK_LABELS[i] if i < len(RANK_LABELS) else f"L{i+1}"
+    for b in out:
+        b.setdefault("rank_label", "")
+    return out
+
+
+def _notice_with_entries(notice_id, with_bids=True):
+    conn = db.get_db()
+    notice = db.fetchone(conn, """SELECT n.*, s.scheme_name FROM tender_notices n
+                                  LEFT JOIN schemes s ON s.scheme_id=n.scheme_id
+                                  WHERE n.notice_id=?""", (notice_id,))
+    if not notice:
+        conn.close()
+        return None, []
+    entries = db.fetchall(conn, """SELECT t.*, w.work_name, w.work_code, w.estimated_amount, w.go_id,
+                                       g.go_number, g.go_date, g.govt_letter_ref, s2.scheme_name,
+                                       f.firm_name AS l1_firm_name, f.gst_no, f.pan_no, f.contact_no, f.email
+                                FROM tenders t
+                                JOIN works w ON w.work_id=t.work_id
+                                LEFT JOIN go_register g ON g.go_id=w.go_id
+                                LEFT JOIN schemes s2 ON s2.scheme_id=w.scheme_id
+                                LEFT JOIN firms f ON f.firm_id=t.l1_firm_id
+                                WHERE t.notice_id=?
+                                ORDER BY g.go_id, w.work_code""", (notice_id,))
+    rows = []
+    for e in entries:
+        item = dict(e)
+        if with_bids:
+            bids = db.fetchall(conn, "SELECT * FROM tender_bids WHERE tender_id=? ORDER BY bid_id", (e["tender_id"],))
+            item["bids"] = _rank_bids(bids)
+        rows.append(item)
+    conn.close()
+    return notice, rows
+
+
+# ---------------- भाग लेने वाली फर्में — जोड़ना / बदलना / हटाना ----------------
+
+@app.route("/tenders/entry/<int:tender_id>/bids/add", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def add_tender_bid(tender_id):
+    conn = db.get_db()
+    row = db.fetchone(conn, "SELECT notice_id FROM tenders WHERE tender_id=?", (tender_id,))
+    names = request.form.get("firm_names", "")
+    added = 0
+    for nm in [n.strip() for n in names.replace("\r", "").split("\n") if n.strip()]:
+        db.insert_and_get_id(conn, "tender_bids", "bid_id",
+            ["tender_id", "firm_name", "technical_status"], (tender_id, nm, "स्वीकृत"))
+        added += 1
+    conn.commit()
+    nid = row["notice_id"] if row else None
+    conn.close()
+    flash(f"{added} फर्म जोड़ी गईं।", "success")
+    return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
+
+
+@app.route("/tenders/bids/<int:bid_id>/update", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def update_tender_bid(bid_id):
+    conn = db.get_db()
+    row = db.fetchone(conn, """SELECT b.*, t.notice_id FROM tender_bids b
+                               JOIN tenders t ON t.tender_id=b.tender_id WHERE b.bid_id=?""", (bid_id,))
+    if request.form.get("delete"):
+        db.run(conn, "DELETE FROM tender_bids WHERE bid_id=?", (bid_id,))
+        flash("फर्म हटाई गई।", "success")
+    else:
+        db.run(conn, """UPDATE tender_bids SET firm_name=?, technical_status=?, reject_reason=?, bid_amount=?
+                        WHERE bid_id=?""",
+               (request.form.get("firm_name"), request.form.get("technical_status") or "स्वीकृत",
+                request.form.get("reject_reason"),
+                to_float(request.form.get("bid_amount") or 0) or None, bid_id))
+        flash("अपडेट हुआ।", "success")
+    conn.commit()
+    nid = row["notice_id"] if row else None
+    conn.close()
+    return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
+
+
+@app.route("/tenders/entry/<int:tender_id>/award", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def update_tender_award(tender_id):
+    conn = db.get_db()
+    row = db.fetchone(conn, "SELECT notice_id FROM tenders WHERE tender_id=?", (tender_id,))
+    db.run(conn, """UPDATE tenders SET agreement_no=?, agreement_date=?, wo_no=?, wo_date=?
+                    WHERE tender_id=?""",
+           (request.form.get("agreement_no"), request.form.get("agreement_date") or None,
+            request.form.get("wo_no"), request.form.get("wo_date") or None, tender_id))
+    conn.commit()
+    nid = row["notice_id"] if row else None
+    conn.close()
+    flash("एग्रीमेंट/कार्यादेश का विवरण सहेजा गया।", "success")
+    return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
+
+
+# ---------------- प्रिंट प्रारूप ----------------
+
+@app.route("/tenders/<int:notice_id>/print/m1")
+@login_required
+def tender_print_m1(notice_id):
+    notice, rows = _notice_with_entries(notice_id)
+    if not notice:
+        flash("निविदा सूचना नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_m1.html", notice=notice, rows=rows, doc_cols=M1_DOC_COLUMNS)
+
+
+@app.route("/tenders/<int:notice_id>/print/d2")
+@login_required
+def tender_print_d2(notice_id):
+    notice, rows = _notice_with_entries(notice_id)
+    if not notice:
+        flash("निविदा सूचना नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_d2.html", notice=notice, rows=rows)
+
+
+@app.route("/tenders/<int:notice_id>/print/d3")
+@login_required
+def tender_print_d3(notice_id):
+    notice, rows = _notice_with_entries(notice_id)
+    if not notice:
+        flash("निविदा सूचना नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_d3.html", notice=notice, rows=rows)
+
+
+@app.route("/tenders/entry/<int:tender_id>/agreement")
+@login_required
+def tender_agreement_print(tender_id):
+    conn = db.get_db()
+    e = db.fetchone(conn, """SELECT t.*, w.work_name, w.work_code, w.estimated_amount,
+                                 n.notice_no, n.notice_date, n.letter_no,
+                                 n.tender_no AS notice_tender_no, s.scheme_name,
+                                 f.firm_name AS l1_firm_name, f.proprietor_name, f.gst_no, f.pan_no,
+                                 f.contact_no, f.email
+                          FROM tenders t
+                          JOIN works w ON w.work_id=t.work_id
+                          LEFT JOIN tender_notices n ON n.notice_id=t.notice_id
+                          LEFT JOIN schemes s ON s.scheme_id=w.scheme_id
+                          LEFT JOIN firms f ON f.firm_id=t.l1_firm_id
+                          WHERE t.tender_id=?""", (tender_id,))
+    conn.close()
+    if not e:
+        flash("प्रविष्टि नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_agreement.html", e=e)
+
+
+@app.route("/tenders/entry/<int:tender_id>/workorder")
+@login_required
+def tender_workorder_print(tender_id):
+    conn = db.get_db()
+    e = db.fetchone(conn, """SELECT t.*, w.work_name, w.work_code, w.estimated_amount,
+                                 n.notice_no, n.notice_date, n.letter_no,
+                                 n.tender_no AS notice_tender_no, s.scheme_name,
+                                 g.go_number, g.go_date, g.govt_letter_ref,
+                                 f.firm_name AS l1_firm_name, f.proprietor_name, f.gst_no, f.pan_no,
+                                 f.contact_no, f.email
+                          FROM tenders t
+                          JOIN works w ON w.work_id=t.work_id
+                          LEFT JOIN tender_notices n ON n.notice_id=t.notice_id
+                          LEFT JOIN go_register g ON g.go_id=w.go_id
+                          LEFT JOIN schemes s ON s.scheme_id=w.scheme_id
+                          LEFT JOIN firms f ON f.firm_id=t.l1_firm_id
+                          WHERE t.tender_id=?""", (tender_id,))
+    conn.close()
+    if not e:
+        flash("प्रविष्टि नहीं मिली।", "error")
+        return redirect(url_for("tender_notices"))
+    return render_template("tender_workorder.html", e=e)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
