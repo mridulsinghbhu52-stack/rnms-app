@@ -38,11 +38,13 @@
           <option value="{{ t }}" {% if (notice.tender_type or 'अल्पकालिक') == t %}selected{% endif %}>{{ t }}</option>
           {% endfor %}
         </select></div>
-      <div class="col-md-2"><label class="form-label small mb-0">टेंडर संख्या
-          <span class="text-muted" style="font-size:11px">(NIT के बाद)</span></label>
-        <input name="tender_no" value="{{ notice.tender_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
-      <div class="col-md-2"><label class="form-label small mb-0">e-Tender संदर्भ</label>
-        <input name="eproc_ref" value="{{ notice.eproc_ref or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+      <div class="col-md-3"><label class="form-label small mb-0">टेंडर संख्या
+          <span class="text-muted" style="font-size:11px">(NIT छपने के बाद)</span></label>
+        <div class="input-group input-group-sm">
+          <input name="tender_no" value="{{ notice.tender_no or '' }}" class="form-control" {% if not can_edit %}disabled{% endif %}>
+          <a href="{{ url_for('manage_documents', related_type='TENDER_NOTICE', related_id=notice.notice_id) }}"
+             class="btn btn-outline-secondary" title="हस्ताक्षरित NIT संलग्न करें">📎 NIT</a>
+        </div></div>
 
       <div class="col-md-5"><label class="form-label small mb-0">मद (योजना)</label>
         <select name="scheme_id" id="dScheme" class="form-select form-select-sm" {% if not can_edit %}disabled{% endif %}>
@@ -114,22 +116,36 @@
 {% if can_edit %}
 <div class="card mb-4">
   <div class="card-header">इस निविदा में कार्य जोड़ें &mdash;
-    <small class="text-muted">जिन कार्यों का टेंडर हो चुका है वे सूची में नहीं आते</small></div>
+    <small class="text-muted">मद व शासनादेश चुनिए, उसी के वे कार्य दिखेंगे जिनका टेंडर नहीं हुआ</small></div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('add_work_to_notice', notice_id=notice.notice_id) }}">
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-md-4">
-          <label class="form-label small mb-0">कार्य खोजें</label>
-          <input id="workSearch" class="form-control form-control-sm" placeholder="कार्य का नाम / कोड / GO / योजना">
+        <div class="col-md-3">
+          <label class="form-label small mb-0">मद (योजना)</label>
+          <select id="fScheme" class="form-select form-select-sm">
+            <option value="">— सभी —</option>
+            {% for s in schemes %}<option value="{{ s.scheme_id }}">{{ s.scheme_name }}</option>{% endfor %}
+          </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label small mb-0">कार्यावधि (सभी चुने कार्यों के लिए)</label>
-          <input name="work_duration" class="form-control form-control-sm" placeholder="3 माह">
-        </div>
-        <div class="col-md-3">
-          <button type="button" id="selAll" class="btn btn-sm btn-outline-secondary w-100">सभी चुनें / हटाएं</button>
+          <label class="form-label small mb-0">शासनादेश (GO)</label>
+          <select id="fGo" class="form-select form-select-sm">
+            <option value="">— पहले मद चुनें —</option>
+            {% for g in gos %}<option value="{{ g.go_id }}" data-scheme="{{ g.scheme_id or '' }}">{{ g.go_number }}</option>{% endfor %}
+          </select>
         </div>
         <div class="col-md-2">
+          <label class="form-label small mb-0">कार्य खोजें</label>
+          <input id="workSearch" class="form-control form-control-sm" placeholder="नाम / कोड">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-0">कार्यावधि (सभी के लिए)</label>
+          <input name="work_duration" class="form-control form-control-sm" placeholder="3 माह">
+        </div>
+        <div class="col-md-1">
+          <button type="button" id="selAll" class="btn btn-sm btn-outline-secondary w-100" title="सभी चुनें / हटाएं">सभी</button>
+        </div>
+        <div class="col-md-1">
           <button class="btn btn-sm btn-success w-100">जोड़ें</button>
         </div>
       </div>
@@ -148,7 +164,7 @@
           </thead>
           <tbody>
             {% for w in available %}
-            <tr>
+            <tr data-scheme="{{ w.scheme_id or '' }}" data-go="{{ w.go_id or '' }}">
               <td><input type="checkbox" name="work_id" value="{{ w.work_id }}" class="form-check-input wchk"></td>
               <td>{{ w.work_code }}</td>
               <td>{{ w.work_name }}</td>
@@ -176,13 +192,49 @@
   var box = document.getElementById('workSearch');
   var tbl = document.getElementById('workTable');
   if (box && tbl) {
-    box.addEventListener('input', function(){
-      var q = this.value.toLowerCase().trim();
-      tbl.querySelectorAll('tbody tr').forEach(function(tr){
-        tr.style.display = (!q || tr.innerText.toLowerCase().indexOf(q) > -1) ? '' : 'none';
-      });
+    box.addEventListener('input', function(){ applyFilter(); });
+  }
+  var fSch = document.getElementById('fScheme');
+  var fGo  = document.getElementById('fGo');
+  var goOpts = [];
+  if (fGo) {
+    Array.prototype.forEach.call(fGo.options, function(o, i){
+      if (i === 0) return;
+      goOpts.push({ v:o.value, t:o.textContent.trim(), s:o.getAttribute('data-scheme')||'' });
     });
   }
+  function applyFilter(){
+    if (!tbl) return;
+    var sv = fSch ? fSch.value : '';
+    var gv = fGo ? fGo.value : '';
+    var q = box ? box.value.toLowerCase().trim() : '';
+    tbl.querySelectorAll('tbody tr').forEach(function(tr){
+      var ok = true;
+      if (sv && tr.getAttribute('data-scheme') !== sv) ok = false;
+      if (gv && tr.getAttribute('data-go') !== gv) ok = false;
+      if (q && tr.innerText.toLowerCase().indexOf(q) === -1) ok = false;
+      tr.style.display = ok ? '' : 'none';
+    });
+  }
+  function refreshGoList(){
+    if (!fGo) return;
+    var sv = fSch ? fSch.value : '';
+    fGo.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = ''; o0.textContent = sv ? '— सभी शासनादेश —' : '— पहले मद चुनें —';
+    fGo.appendChild(o0);
+    goOpts.forEach(function(g){
+      if (sv && g.s !== sv) return;
+      var o = document.createElement('option');
+      o.value = g.v; o.textContent = g.t;
+      fGo.appendChild(o);
+    });
+  }
+  if (fSch) fSch.addEventListener('change', function(){ refreshGoList(); applyFilter(); });
+  if (fGo) fGo.addEventListener('change', applyFilter);
+  refreshGoList();
+  applyFilter();
+
   var btn = document.getElementById('selAll');
   if (btn) {
     btn.addEventListener('click', function(){
@@ -194,6 +246,28 @@
       boxes.forEach(function(c){ c.checked = !allOn; });
     });
   }
+
+  document.querySelectorAll('.bidMake').forEach(function(mk){
+    mk.addEventListener('click', function(){
+      var form = mk.closest('form');
+      var n = parseInt(form.querySelector('.bidCount').value || '0', 10);
+      if (!n || n < 1) { alert('पहले फर्मों की संख्या भरें।'); return; }
+      if (n > 30) n = 30;
+      var wrap = form.querySelector('.bidRows');
+      wrap.innerHTML = '';
+      for (var i = 1; i <= n; i++) {
+        var col = document.createElement('div');
+        col.className = 'col-md-4';
+        col.innerHTML = '<div class="input-group input-group-sm">' +
+          '<span class="input-group-text">' + i + '</span>' +
+          '<input name="firm_names" class="form-control" placeholder="फर्म का नाम"></div>';
+        wrap.appendChild(col);
+      }
+      form.querySelector('.bidSubmit').classList.remove('d-none');
+      var first = wrap.querySelector('input');
+      if (first) first.focus();
+    });
+  });
 })();
 </script>
 {% endif %}
@@ -257,57 +331,120 @@
     </form>
 
     <hr class="my-3">
+
+    <div class="mb-3">
+      <div class="small fw-bold mb-2">चरण 1 &mdash; भाग लेने वाली फर्में ({{ (e.bids or [])|length }})
+        <span class="text-muted fw-normal">&nbsp;नाम टाइप कर सकते हैं, मास्टर में होना ज़रूरी नहीं</span></div>
+
+      {% if can_edit %}
+      <form method="POST" action="{{ url_for('add_tender_bid', tender_id=e.tender_id) }}" class="mb-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small mb-0">कितनी फर्मों ने भाग लिया?</label>
+            <div class="input-group input-group-sm">
+              <input type="number" min="1" max="30" class="form-control bidCount" placeholder="जैसे 4">
+              <button type="button" class="btn btn-outline-secondary bidMake">पंक्तियाँ बनाएँ</button>
+            </div>
+          </div>
+        </div>
+        <div class="row g-2 mt-1 bidRows"></div>
+        <div class="mt-2 bidSubmit d-none">
+          <button class="btn btn-sm btn-success">फर्में जोड़ें</button>
+        </div>
+      </form>
+      {% endif %}
+
+      <table class="table table-sm mb-2">
+        <thead><tr>
+          <th>फर्म का नाम</th>
+          <th style="width:18%">चरण 2 &mdash; तकनीकी</th>
+          <th style="width:20%">अस्वीकृति का कारण</th>
+          <th style="width:15%">चरण 3 &mdash; निविदा दर</th>
+          <th style="width:110px"></th>
+        </tr></thead>
+        <tbody>
+          {% for b in e.bids or [] %}
+          <tr>
+            <form method="POST" action="{{ url_for('update_tender_bid', bid_id=b.bid_id) }}">
+            <td><input name="firm_name" value="{{ b.firm_name }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></td>
+            <td><select name="technical_status" class="form-select form-select-sm" {% if not can_edit %}disabled{% endif %}>
+                  {% for st in ['स्वीकृत','अस्वीकृत'] %}
+                  <option value="{{ st }}" {% if (b.technical_status or 'स्वीकृत') == st %}selected{% endif %}>{{ st }}</option>
+                  {% endfor %}
+                </select></td>
+            <td><input name="reject_reason" value="{{ b.reject_reason or '' }}" class="form-control form-control-sm" placeholder="अस्वीकृत हो तो" {% if not can_edit %}disabled{% endif %}></td>
+            <td><input name="bid_amount" value="{{ '%.2f'|format(b.bid_amount) if b.bid_amount else '' }}" class="form-control form-control-sm" placeholder="वित्तीय बिड खुलने पर" {% if not can_edit %}disabled{% endif %}></td>
+            <td class="text-nowrap">
+              {% if b.rank_label %}<span class="badge bg-success">{{ b.rank_label }}</span>{% endif %}
+              {% if can_edit %}
+              <button class="btn btn-sm btn-outline-primary">✓</button>
+              <button name="delete" value="1" class="btn btn-sm btn-outline-danger" onclick="return confirm('हटाएँ?')">✕</button>
+              {% endif %}
+            </td>
+            </form>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-muted text-center py-2">अभी कोई फर्म दर्ज नहीं</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <small class="text-muted">फर्में जोड़ने के बाद ऊपर <strong>M1</strong> छापिए &rarr; हस्ताक्षर के बाद
+        तकनीकी में स्वीकृत/अस्वीकृत भरिए &rarr; <strong>D2</strong> छापिए &rarr; वित्तीय बिड खुलने पर
+        निविदा दर भरिए, सबसे कम वाली अपने-आप L1 दिखेगी &rarr; नीचे L1 का विवरण भरकर
+        <strong>D3</strong> छापिए।</small>
+    </div>
+
+    <hr class="my-3">
     <div class="row g-3">
       <div class="col-md-7">
-        <div class="small fw-bold mb-1">भाग लेने वाली फर्में ({{ (e.bids or [])|length }})</div>
-        <table class="table table-sm mb-2">
-          <thead><tr><th>फर्म का नाम</th><th style="width:20%">तकनीकी</th><th style="width:17%">निविदा दर</th><th style="width:20%">अस्वीकृति का कारण</th><th style="width:110px"></th></tr></thead>
-          <tbody>
-            {% for b in e.bids or [] %}
-            <tr>
-              <form method="POST" action="{{ url_for('update_tender_bid', bid_id=b.bid_id) }}">
-              <td><input name="firm_name" value="{{ b.firm_name }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></td>
-              <td><select name="technical_status" class="form-select form-select-sm" {% if not can_edit %}disabled{% endif %}>
-                    {% for st in ['स्वीकृत','अस्वीकृत'] %}
-                    <option value="{{ st }}" {% if (b.technical_status or 'स्वीकृत') == st %}selected{% endif %}>{{ st }}</option>
-                    {% endfor %}
-                  </select></td>
-              <td><input name="bid_amount" value="{{ '%.2f'|format(b.bid_amount) if b.bid_amount else '' }}" class="form-control form-control-sm" placeholder="वैकल्पिक" {% if not can_edit %}disabled{% endif %}></td>
-              <td><input name="reject_reason" value="{{ b.reject_reason or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></td>
-              <td class="text-nowrap">
-                {% if b.rank_label %}<span class="badge bg-success">{{ b.rank_label }}</span>{% endif %}
-                {% if can_edit %}
-                <button class="btn btn-sm btn-outline-primary">✓</button>
-                <button name="delete" value="1" class="btn btn-sm btn-outline-danger" onclick="return confirm('हटाएँ?')">✕</button>
-                {% endif %}
-              </td>
-              </form>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" class="text-muted text-center">अभी कोई फर्म दर्ज नहीं</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% if can_edit %}
-        <form method="POST" action="{{ url_for('add_tender_bid', tender_id=e.tender_id) }}" class="row g-2">
-          <div class="col-md-9">
-            <textarea name="firm_names" rows="2" class="form-control form-control-sm" placeholder="फर्मों के नाम — हर नाम अलग लाइन में"></textarea>
+        <div class="small fw-bold mb-1">चरण 4 &mdash; L1 फर्म का विवरण</div>
+        <form method="POST" action="{{ url_for('set_tender_l1', tender_id=e.tender_id) }}" class="row g-2">
+          <div class="col-md-6"><label class="form-label small mb-0">L1 फर्म का नाम</label>
+            <input name="l1_firm_name" list="bl{{ e.tender_id }}" value="{{ e.firm_name or '' }}"
+                   class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}>
+            <datalist id="bl{{ e.tender_id }}">
+              {% for b in e.bids or [] %}{% if (b.technical_status or 'स्वीकृत') == 'स्वीकृत' %}
+              <option value="{{ b.firm_name }}">{% endif %}{% endfor %}
+            </datalist></div>
+          <div class="col-md-6"><label class="form-label small mb-0">प्रोपराइटर का नाम</label>
+            <input name="proprietor_name" value="{{ e.proprietor_name or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">GST नं0</label>
+            <input name="gst_no" value="{{ e.gst_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">PAN</label>
+            <input name="pan_no" value="{{ e.pan_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">मोबाइल</label>
+            <input name="contact_no" value="{{ e.contact_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-8"><label class="form-label small mb-0">पता</label>
+            <input name="address" value="{{ e.address or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">ई&mdash;मेल</label>
+            <input name="email" value="{{ e.email or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">L1 राशि (भुगतान सीमा)</label>
+            <input name="l1_amount" value="{{ '%.2f'|format(e.l1_amount) if e.l1_amount else '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4"><label class="form-label small mb-0">EMD बैंक संदर्भ</label>
+            <input name="emd_bank_ref" value="{{ e.emd_bank_ref or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
+          <div class="col-md-4 d-flex align-items-end gap-2">
+            <div class="form-check me-2">
+              <input class="form-check-input" type="checkbox" name="emd_verified" id="ev{{ e.tender_id }}"
+                     {% if e.emd_verified %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+              <label class="form-check-label small" for="ev{{ e.tender_id }}">EMD सत्यापित</label>
+            </div>
+            {% if can_edit %}<button class="btn btn-sm btn-primary">सहेजें</button>{% endif %}
           </div>
-          <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-sm btn-success w-100">फर्में जोड़ें</button>
+          <div class="col-12">
+            <a href="{{ url_for('manage_documents', related_type='TENDER', related_id=e.tender_id) }}"
+               class="btn btn-sm btn-outline-secondary">📎 L1 के e-Tender दस्तावेज़, EMD, हस्ताक्षरित M1/D2/D3</a>
           </div>
         </form>
-        {% endif %}
       </div>
 
       <div class="col-md-5">
-        <div class="small fw-bold mb-1">अनुबन्ध एवं कार्यादेश</div>
+        <div class="small fw-bold mb-1">चरण 5 &mdash; अनुबन्ध एवं कार्यादेश</div>
         <form method="POST" action="{{ url_for('update_tender_award', tender_id=e.tender_id) }}" class="row g-2">
           <div class="col-6"><label class="form-label small mb-0">अनुबन्ध संख्या</label>
             <input name="agreement_no" value="{{ e.agreement_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
           <div class="col-6"><label class="form-label small mb-0">अनुबन्ध दिनांक</label>
             <input type="date" name="agreement_date" value="{{ e.agreement_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
-          <div class="col-6"><label class="form-label small mb-0">कार्यादेश संख्या</label>
+          <div class="col-6"><label class="form-label small mb-0">कार्यादेश पत्रांक</label>
             <input name="wo_no" value="{{ e.wo_no or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
           <div class="col-6"><label class="form-label small mb-0">कार्यादेश दिनांक</label>
             <input type="date" name="wo_date" value="{{ e.wo_date or '' }}" class="form-control form-control-sm" {% if not can_edit %}disabled{% endif %}></div>
@@ -317,6 +454,7 @@
             <a href="{{ url_for('tender_workorder_print', tender_id=e.tender_id) }}" class="btn btn-sm btn-outline-dark" target="_blank">🖨️ कार्यादेश</a>
           </div>
         </form>
+      </div>
       </div>
     </div>
   </div>
