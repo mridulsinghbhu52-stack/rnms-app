@@ -1105,6 +1105,7 @@ def import_works():
 
 DOC_CATEGORY_MAP = {"TENDER_NOTICE": [
         ("NOTICE_DOC", "निविदा दस्तावेज़ (NIT)"),
+        ("SIGNED_NIT", "हस्ताक्षरित NIT"),
         ("PUBLICATION", "सूचना प्रकाशन (अख़बार कतरन)"),
         ("EPROC", "e-Tender पोर्टल प्रति / रसीद"),
         ("TECH_BID_RECORD", "तकनीकी बिड अभिलेख"),
@@ -2128,6 +2129,41 @@ def tender_workorder_print(tender_id):
         flash("प्रविष्टि नहीं मिली।", "error")
         return redirect(url_for("tender_notices"))
     return render_template("tender_workorder.html", e=e)
+@app.route("/tenders/entry/<int:tender_id>/l1", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def set_tender_l1(tender_id):
+    conn = db.get_db()
+    row = db.fetchone(conn, "SELECT notice_id FROM tenders WHERE tender_id=?", (tender_id,))
+    name = (request.form.get("l1_firm_name") or "").strip()
+
+    firm_id = None
+    if name:
+        firm_id = _find_or_create_firm(conn, name)
+        cur = db.fetchone(conn, "SELECT * FROM firms WHERE firm_id=?", (firm_id,))
+
+        def pick(field):
+            v = (request.form.get(field) or "").strip()
+            if v:
+                return v
+            try:
+                return cur[field]
+            except (KeyError, TypeError):
+                return None
+
+        db.run(conn, """UPDATE firms SET proprietor_name=?, gst_no=?, pan_no=?,
+                            contact_no=?, email=?, address=? WHERE firm_id=?""",
+               (pick("proprietor_name"), pick("gst_no"), pick("pan_no"),
+                pick("contact_no"), pick("email"), pick("address"), firm_id))
+
+    db.run(conn, """UPDATE tenders SET l1_firm_id=?, l1_amount=?, emd_bank_ref=?, emd_verified=?
+                    WHERE tender_id=?""",
+           (firm_id, to_float(request.form.get("l1_amount") or 0) or None,
+            request.form.get("emd_bank_ref"), bool(request.form.get("emd_verified")), tender_id))
+    conn.commit()
+    nid = row["notice_id"] if row else None
+    conn.close()
+    flash("L1 का विवरण सहेजा गया।", "success")
+    return redirect(url_for("tender_notice_detail", notice_id=nid) if nid else url_for("tender_notices"))
 
 
 if __name__ == "__main__":
