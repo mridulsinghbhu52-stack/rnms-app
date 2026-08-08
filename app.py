@@ -1120,14 +1120,20 @@ DOC_CATEGORY_MAP = {"TENDER_NOTICE": [
         ("PHOTO_PROGRESS", "फोटो - कार्य प्रगति के दौरान"),
         ("PHOTO_AFTER", "फोटो - कार्य पूर्ण होने पर"),
     ],
-    "TENDER": [
+   "TENDER": [
         ("TENDER_NOTICE", "निविदा सूचना"),
-        ("EMD", "धरोहर राशि (EMD) रसीद"),
-        ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),("L1_PAPERS", "L1 के हार्ड पेपर"),
+        ("L1_ALL_DOCS", "L1 के समस्त निविदा दस्तावेज़ (e-Tender से)"),
+        ("L1_EMD", "L1 — धरोहर राशि (EMD)"),
         ("EMD_BANK_VERIFY", "EMD बैंक सत्यापन"),
-        ("WORK_ORDER", "कार्यादेश (Work Order)"),
-        ("AGREEMENT", "अनुबंध (Agreement)"),
+        ("L1_COMPARATIVE", "L1 तुलनात्मक विवरण"),
+        ("M1_CHECKLIST", "M1 — हस्ताक्षरित जाँच-सूची"),
+        ("D2_NOTING", "D2 — हस्ताक्षरित तकनीकी नोटिंग"),
+        ("D3_NOTING", "D3 — हस्ताक्षरित वित्तीय नोटिंग"),
+        ("AGREEMENT", "अनुबन्ध (Agreement) — हस्ताक्षरित"),
+        ("WORK_ORDER", "कार्यादेश (Work Order) — हस्ताक्षरित"),
+        ("OTHER", "अन्य"),
     ],
+
     "BILL": [
     ("MEASUREMENT_BOOK", "माप पुस्तिका (MB)"),
      ("INSPECTION_REPORT", "जांच रिपोर्ट"),
