@@ -1708,15 +1708,57 @@ def tender_notices():
 @app.route("/tenders/new", methods=["POST"])
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
 def new_tender_notice():
+    work_ids = [w for w in request.form.getlist("work_id") if w]
+    if not work_ids:
+        flash("कम से कम एक कार्य चुनना आवश्यक है — कार्य के बिना निविदा सूचना दर्ज नहीं होगी।", "error")
+        return redirect(url_for("tender_notices"))
+
     conn = db.get_db()
     v = _notice_form_values(request.form)
     cols = list(v.keys()) + ["status", "created_by"]
     vals = tuple(list(v.values()) + ["PUBLISHED", session["user_id"]])
     notice_id = db.insert_and_get_id(conn, "tender_notices", "notice_id", cols, vals)
+
+    duration = request.form.get("work_duration") or "3 माह"
+    added = 0
+    for raw in work_ids:
+        try:
+            work_id = int(raw)
+        except (TypeError, ValueError):
+            continue
+        work = db.fetchone(conn, "SELECT * FROM works WHERE work_id=?", (work_id,))
+        if not work:
+            continue
+        excl = _excl_gst(work["estimated_amount"])
+        emd = _emd_amount(excl)
+        fee = _tender_fee(excl)
+        existing = db.fetchone(conn, """SELECT * FROM tenders WHERE work_id=? AND notice_id IS NULL
+                                        ORDER BY tender_id DESC LIMIT 1""", (work_id,))
+        if existing:
+            db.run(conn, """UPDATE tenders SET notice_id=?, tender_date=?, tender_amount=?,
+                            amount_excl_gst=?, emd_amount=?, tender_fee=?, work_duration=?
+                            WHERE tender_id=?""",
+                   (notice_id, v.get("notice_date"), excl, excl, emd, fee, duration, existing["tender_id"]))
+        else:
+            db.insert_and_get_id(conn, "tenders", "tender_id",
+                ["work_id", "notice_id", "tender_date", "tender_amount",
+                 "amount_excl_gst", "emd_amount", "tender_fee", "work_duration"],
+                (work_id, notice_id, v.get("notice_date"), excl, excl, emd, fee, duration))
+        db.run(conn, "UPDATE works SET status='TENDERED' WHERE work_id=?", (work_id,))
+        added += 1
+
+    if not added:
+        db.run(conn, "DELETE FROM tender_notices WHERE notice_id=?", (notice_id,))
+        conn.commit()
+        conn.close()
+        flash("कोई वैध कार्य नहीं मिला — निविदा सूचना दर्ज नहीं हुई।", "error")
+        return redirect(url_for("tender_notices"))
+
     conn.commit()
     conn.close()
-    flash("निविदा सूचना दर्ज हुई। अब इसमें कार्य जोड़ें।", "success")
+    flash(f"निविदा सूचना दर्ज हुई — {added} कार्य जोड़े गए। अब NIT छापिए।", "success")
     return redirect(url_for("tender_notice_detail", notice_id=notice_id))
+
 
 
 @app.route("/tenders/<int:notice_id>/update", methods=["POST"])
