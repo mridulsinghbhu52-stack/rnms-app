@@ -409,44 +409,34 @@ def new_charge():
 
 @app.route("/works")
 @login_required
-def works_list():
-    conn = db.get_db()
-    works = db.fetchall(conn, """SELECT w.*, s.scheme_name, wd.ward_name FROM works w
-                                  JOIN schemes s ON s.scheme_id=w.scheme_id
-                                  LEFT JOIN wards wd ON wd.ward_id=w.ward_id
-                                  ORDER BY w.work_id DESC""")
-    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=TRUE OR is_active=TRUE ORDER BY scheme_name")
-    wards = db.fetchall(conn, "SELECT * FROM wards ORDER BY ward_no")
-    fys = db.fetchall(conn, "SELECT * FROM financial_years ORDER BY fy_id DESC")
-    asset_types = db.fetchall(conn, "SELECT * FROM asset_types ORDER BY asset_type_name")
-    conn.close()
-    return render_template("works_list.html", works=works, schemes=schemes, wards=wards, fys=fys, asset_types=asset_types)
-
-
-@app.route("/works/new", methods=["POST"])
+@app.route("/finance/go/<int:go_id>/installments/new", methods=["POST"])
 @require_role("ACCOUNT_OPERATOR", "ADMIN")
-def new_work():
+def new_installment(go_id):
     conn = db.get_db()
-    scheme_id = int(request.form["scheme_id"])
-    fy_id = int(request.form["fy_id"])
-    scheme = db.fetchone(conn, "SELECT scheme_code, non_tender_allowed FROM schemes WHERE scheme_id=?", (scheme_id,))
-    fy = db.fetchone(conn, "SELECT fy_name FROM financial_years WHERE fy_id=?", (fy_id,))
-    count = db.fetchone(conn, "SELECT COUNT(*) AS c FROM works WHERE scheme_id=? AND fy_id=?", (scheme_id, fy_id))["c"]
-    work_code = f"RNMS/{scheme['scheme_code']}/{fy['fy_name']}/{count + 1:04d}"
-    is_tendered = 1 if request.form.get("is_tendered") else 0
-    if not is_tendered and not scheme["non_tender_allowed"]:
+    go = db.fetchone(conn, "SELECT * FROM go_register WHERE go_id=?", (go_id,))
+    if not go:
         conn.close()
-        flash("इस मद में बिना टेंडर कार्य दर्ज करने की अनुमति नहीं है।", "error")
-        return redirect(url_for("works_list"))
-    db.insert_and_get_id(conn, "works", "work_id",
-        ["work_code", "scheme_id", "ward_id", "fy_id", "asset_type_id", "work_name", "work_source",
-         "is_tendered", "estimated_amount", "status", "proposed_date", "created_by"],
-        (work_code, scheme_id, request.form.get("ward_id") or None, fy_id, request.form.get("asset_type_id") or None,
-         request.form["work_name"], request.form.get("work_source", "NEW"), is_tendered,
-         to_float(request.form["estimated_amount"]), "PROPOSED", today(), session["user_id"]))
+        flash("शासनादेश नहीं मिला।", "error")
+        return redirect(url_for("finance"))
+    row = db.fetchone(conn, """SELECT COALESCE(MAX(installment_no), 0) AS m
+                               FROM installments WHERE go_id=?""", (go_id,))
+    no = int(row["m"] or 0) + 1
+    amount = to_float(request.form["amount_received"])
+    bank_account_id = int(request.form["bank_account_id"])
+    db.insert_and_get_id(conn, "installments", "installment_id",
+        ["go_id", "scheme_id", "installment_no", "amount_received", "received_date",
+         "bank_account_id", "letter_no", "letter_date", "bank_reference_no", "remarks", "created_by"],
+        (go_id, go["scheme_id"], no, amount, request.form["received_date"], bank_account_id,
+         request.form.get("letter_no"), request.form.get("letter_date") or None,
+         request.form.get("bank_reference_no"), request.form.get("remarks"), session["user_id"]))
+    post_cashbook_entry(conn, bank_account_id, go["scheme_id"], request.form["received_date"],
+                         f"किस्त प्राप्त — {go['go_number']} (किस्त {no})",
+                         receipt=amount, reference_type="INSTALLMENT", reference_id=go_id,
+                         created_by=session["user_id"])
+    conn.commit()
     conn.close()
-    flash(f"कार्य दर्ज हुआ — {work_code}", "success")
-    return redirect(url_for("works_list"))
+    flash(f"किस्त {no} दर्ज हुई।", "success")
+    return redirect(url_for("finance"))
 
 
 @app.route("/works/<int:work_id>")
