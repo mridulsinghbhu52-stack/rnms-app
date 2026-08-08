@@ -1,1 +1,60 @@
+{% extends "base.html" %}
+{% block title %}तकनीकी बिड जाँच-सूची (M1){% endblock %}
+{% block content %}
+<style>
+  .m1 { background:#fff; padding:18px 22px; color:#000; font-family:"Nirmala UI","Mangal","Noto Sans Devanagari",sans-serif; font-size:13px; }
+  .m1 h6 { text-align:center; margin-bottom:6px; }
+  .m1 table { width:100%; border-collapse:collapse; font-size:10.5px; margin-top:8px; }
+  .m1 th, .m1 td { border:1px solid #000; padding:3px 2px; text-align:center; vertical-align:middle; }
+  .m1 th { font-weight:600; }
+  .m1 .fname { text-align:left; font-size:11px; }
+  .dotted { border-bottom:1px dotted #333; display:inline-block; min-width:180px; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  @media print { .d-print-none{display:none!important} @page { size: A4 landscape; margin: 10mm; } }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none">
+  <a href="{{ url_for('tender_notice_detail', notice_id=notice.notice_id) }}" class="btn btn-sm btn-outline-secondary">← वापस</a>
+  <span class="text-muted small align-self-center">सोलह कॉलम खाली छपेंगे — कलम से ✓/✗ करके हस्ताक्षर कराएँ, फिर स्कैन करके 📎 से अपलोड करें</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+{% for r in rows %}
+<div class="m1 border mb-3 page">
+  <p style="margin-bottom:3px;"><u>योजना का नाम</u>&mdash; <strong>{{ r.scheme_name or '' }}</strong></p>
+  <p style="margin-bottom:3px;"><u>कार्य का नाम</u>&mdash; <strong>{{ r.work_name }}</strong></p>
+  <p style="margin-bottom:3px;"><u>बिड नंबर</u>&mdash; <strong>{{ r.bid_no or '—' }}</strong>
+  &nbsp;&nbsp;<u>कार्य कोड</u>&mdash; <strong>{{ r.work_code or '' }}</strong></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:3%">क्र0<br>सं0</th>
+        <th style="width:14%">फर्म का नाम</th>
+        {% for c in doc_cols %}<th>{{ c }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in r.bids %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td class="fname">{{ b.firm_name }}</td>
+        {% for c in doc_cols %}<td style="height:30px"></td>{% endfor %}
+      </tr>
+      {% endfor %}
+      {% for i in range(4 - (r.bids|length)) if (r.bids|length) < 4 %}
+      <tr><td>{{ (r.bids|length) + loop.index }}</td><td></td>{% for c in doc_cols %}<td style="height:30px"></td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="display:flex;justify-content:space-between;margin-top:46px;text-align:center;font-size:12px;">
+    <div>अवर अभियन्ता</div><div>लिपिक</div><div>अधिशासी अधिकारी</div>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">इस निविदा में कोई कार्य नहीं जोड़ा गया।</p>
+{% endfor %}
+{% endblock %}
 
