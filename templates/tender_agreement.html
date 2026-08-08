@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}अनुबन्ध पत्र{% endblock %}
+{% block content %}
+<style>
+  .ag { max-width:860px; margin:0 auto; background:#fff; padding:28px 36px; color:#000;
+        font-family:"Nirmala UI","Mangal","Noto Sans Devanagari",serif; font-size:14.5px; line-height:2.0; }
+  .ag h5 { text-align:center; font-weight:700; }
+  .ag .title { text-align:center; font-weight:700; text-decoration:underline; margin:12px 0 16px; }
+  .ag p { text-align:justify; margin-bottom:10px; }
+  .ag table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0 14px; }
+  .ag th, .ag td { border:1px solid #000; padding:5px 7px; }
+  .ag th { width:34%; text-align:left; font-weight:600; background:#f5f5f5; }
+  .fillin { display:inline-block; min-width:120px; border-bottom:1px dotted #333; padding:0 5px; outline:none; }
+  .fillin:focus { background:#fffbe6; }
+  .terms li { margin-bottom:6px; text-align:justify; }
+  .signs { display:flex; justify-content:space-between; margin-top:70px; text-align:center; font-size:13.5px; }
+  @media print { .d-print-none{display:none!important} .ag{max-width:100%;padding:0;border:none!important;box-shadow:none!important} @page{size:A4;margin:16mm 14mm} }
+</style>
+
+<div class="d-flex justify-content-between mb-3 d-print-none" style="max-width:860px;margin:0 auto;">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">← वापस</a>
+  <span class="text-muted small align-self-center">100 रु0 के स्टाम्प पेपर पर छापें — बिंदीदार जगहें भरी जा सकती हैं</span>
+  <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ प्रिंट करें</button>
+</div>
+
+<div class="ag border shadow-sm">
+  <h5>कार्यालय नगर पंचायत रतसर कलाँ, जनपद&mdash;बलिया</h5>
+  <div class="title">अनुबन्ध पत्र (Agreement)</div>
+
+  <p>यह अनुबन्ध आज दिनांक <span class="fillin">{{ e.agreement_date|dmy }}</span> को
+  <strong>नगर पंचायत रतसर कलाँ, जनपद&mdash;बलिया</strong> (जिसे आगे &ldquo;प्रथम पक्ष&rdquo; कहा जायेगा) तथा
+  <strong>{{ e.l1_firm_name or '—' }}</strong>{% if e.proprietor_name %} (प्रोपराइटर&mdash;{{ e.proprietor_name }}){% endif %}
+  (जिसे आगे &ldquo;द्वितीय पक्ष / ठेकेदार&rdquo; कहा जायेगा) के मध्य निम्नलिखित शर्तों पर सम्पादित किया जा रहा है&mdash;</p>
+
+  <table>
+    <tr><th>अनुबन्ध संख्या / दिनांक</th><td>{{ e.agreement_no or '' }} &nbsp; / &nbsp; {{ e.agreement_date|dmy }}</td></tr>
+    <tr><th>निविदा सूचना संख्या / दिनांक</th><td>{{ e.notice_no or '' }} &nbsp; / &nbsp; {{ e.notice_date|dmy }}</td></tr>
+    <tr><th>टेंडर संख्या / बिड नंबर</th><td>{{ e.notice_tender_no or '—' }} &nbsp; / &nbsp; <strong>{{ e.bid_no or '—' }}</strong></td></tr>
+    <tr><th>योजना (मद)</th><td>{{ e.scheme_name or '' }}</td></tr>
+    <tr><th>कार्य कोड</th><td>{{ e.work_code or '' }}</td></tr>
+    <tr><th>कार्य का विवरण</th><td>{{ e.work_name }}</td></tr>
+    <tr><th>स्वीकृत धनराशि (GST सहित)</th><td>{{ '%.2f'|format(e.estimated_amount or 0) }}</td></tr>
+    <tr><th>निविदा (टेंडर) धनराशि</th><td>{{ '%.2f'|format(e.amount_excl_gst or 0) }}</td></tr>
+    <tr><th>स्वीकृत निविदा दर (L1 धनराशि)</th><td><strong>{{ '%.2f'|format(e.l1_amount or 0) }}</strong>
+        {% if e.l1_amount %}({{ e.l1_amount|hword }}){% endif %}</td></tr>
+    <tr><th>धरोहर धनराशि (EMD)</th><td>{{ '%.2f'|format(e.emd_amount or 0) }}
+        {% if e.emd_bank_ref %} &mdash; {{ e.emd_bank_ref }}{% endif %}</td></tr>
+    <tr><th>कार्यावधि</th><td>{{ e.work_duration or '' }}</td></tr>
+    <tr><th>ठेकेदार का GST नं0 / PAN</th><td>{{ e.gst_no or '—' }} &nbsp;/&nbsp; {{ e.pan_no or '—' }}</td></tr>
+    <tr><th>ठेकेदार का मोबाइल / ई&mdash;मेल</th><td>{{ e.contact_no or '—' }} &nbsp;/&nbsp; {{ e.email or '—' }}</td></tr>
+    <tr><th>ठेकेदार का पता</th><td><span class="fillin" style="min-width:420px"></span></td></tr>
+  </table>
+
+  <p><strong>अनुबन्ध की शर्तें&mdash;</strong></p>
+  <ol class="terms">
+    <li>द्वितीय पक्ष उपरोक्त निविदा सूचना संख्या {{ e.notice_no or '' }} में उल्लिखित समस्त नियम एवं शर्तों से
+      पूर्णतः सहमत है तथा उनका पालन करने हेतु बाध्य होगा। वे समस्त शर्तें इस अनुबन्ध का अभिन्न अंग मानी जायेंगी।</li>
+    <li>कार्य आगणन (एस्टीमेट) की विशिष्टियों एवं तकनीकी मानकों के अनुरूप, निर्धारित कार्यावधि
+      <strong>{{ e.work_duration or '' }}</strong> के भीतर पूर्ण करना अनिवार्य होगा।</li>
+    <li>कार्य निर्धारित समय में पूर्ण न होने पर नियमानुसार आर्थिक दण्ड (अधिकतम रू0 500/&mdash; प्रतिदिन, दो सप्ताह तक)
+      लगाया जायेगा, जिसकी कटौती ठेकेदार के बिल अथवा जमा धनराशि से की जायेगी। दो सप्ताह के पश्चात अनुबन्ध निरस्त
+      करने की कार्यवाही की जा सकती है।</li>
+    <li>कार्य प्रारम्भ होने से पूर्व, कार्य के दौरान तथा कार्य पूर्ण होने के पश्चात की फोटोग्राफ कार्यालय में
+      जमा करना अनिवार्य होगा।</li>
+    <li>भुगतान नियमानुसार, कार्य की माप (MB) एवं सक्षम अभियन्ता के सत्यापन के उपरान्त, उपलब्ध धनराशि के अनुसार
+      किया जायेगा। निकाय में धनराशि उपलब्ध न होने की स्थिति में ठेकेदार भुगतान हेतु किसी प्रकार का दावा/न्यायालय
+      की शरण नहीं लेगा।</li>
+    <li>भुगतान से नियमानुसार जी0एस0टी0 (CGST 1% एवं SGST 1%), आयकर 2% तथा लागू होने पर श्रम उपकर (Labour Cess) 1%
+      की कटौती की जायेगी।</li>
+    <li>श्रम विभाग से कार्य का पंजीयन कराकर उसकी प्रति कार्यालय में जमा करना अनिवार्य होगा।</li>
+    <li>धरोहर/जमानत धनराशि कार्य के संतोषजनक पूर्ण पाये जाने तथा शासनादेश में उल्लिखित प्राविधानों के अनुपालन के
+      पश्चात ही वापस की जायेगी।</li>
+    <li>निविदा में डाली गई कम दर की स्थिति में शासनादेश के अनुसार अतिरिक्त प्रतिभूति/परफार्मेन्स गारंटी जमा करनी होगी।</li>
+    <li>कार्य की गुणवत्ता असंतोषजनक पाये जाने पर ठेकेदार को अपने व्यय पर उसे ठीक कराना होगा।</li>
+    <li>किसी भी विवाद की स्थिति में न्यायिक क्षेत्र <strong>बलिया</strong> होगा।</li>
+    <li>अन्य कोई शर्त&mdash; <span class="fillin" style="min-width:430px"></span></li>
+  </ol>
+
+  <p>उपरोक्त समस्त शर्तें पढ़/सुनकर एवं समझकर दोनों पक्षों ने अपनी स्वेच्छा से, बिना किसी दबाव के, इस अनुबन्ध पर
+  हस्ताक्षर किये।</p>
+
+  <div class="signs">
+    <div><div style="height:56px"></div>द्वितीय पक्ष (ठेकेदार/फर्म)<br>{{ e.l1_firm_name or '' }}</div>
+    <div><div style="height:56px"></div>अधिशासी अधिकारी<br>नगर पंचायत रतसर कलाँ, बलिया</div>
+    <div><div style="height:56px"></div>अध्यक्ष<br>नगर पंचायत रतसर कलाँ, बलिया</div>
+  </div>
+
+  <p style="margin-top:26px;font-size:13px;"><strong>साक्षी&mdash;</strong>
+    1. <span class="fillin" style="min-width:250px"></span> &nbsp;&nbsp;
+    2. <span class="fillin" style="min-width:250px"></span></p>
+</div>
+{% endblock %}
