@@ -409,34 +409,103 @@ def new_charge():
 
 @app.route("/works")
 @login_required
-@app.route("/finance/go/<int:go_id>/installments/new", methods=["POST"])
-@require_role("ACCOUNT_OPERATOR", "ADMIN")
-def new_installment(go_id):
+def works_list():
     conn = db.get_db()
-    go = db.fetchone(conn, "SELECT * FROM go_register WHERE go_id=?", (go_id,))
+    works = db.fetchall(conn, """SELECT w.*, s.scheme_name, wd.ward_name, g.go_number FROM works w
+                                  JOIN schemes s ON s.scheme_id=w.scheme_id
+                                  LEFT JOIN wards wd ON wd.ward_id=w.ward_id
+                                  LEFT JOIN go_register g ON g.go_id=w.go_id
+                                  ORDER BY w.work_id DESC""")
+    schemes = db.fetchall(conn, "SELECT * FROM schemes WHERE is_active=TRUE ORDER BY scheme_name")
+    wards = db.fetchall(conn, "SELECT * FROM wards ORDER BY ward_no")
+    fys = db.fetchall(conn, "SELECT * FROM financial_years ORDER BY fy_id DESC")
+    asset_types = db.fetchall(conn, "SELECT * FROM asset_types ORDER BY asset_type_name")
+    gos = db.fetchall(conn, """SELECT g.go_id, g.scheme_id, g.fy_id, g.go_number, g.go_date,
+                                   g.works_count, g.total_sanctioned_amount, g.govt_letter_ref,
+                                   (SELECT COUNT(*) FROM works w2 WHERE w2.go_id=g.go_id) AS done_count,
+                                   (SELECT COALESCE(SUM(w3.estimated_amount),0) FROM works w3
+                                      WHERE w3.go_id=g.go_id) AS done_amount
+                               FROM go_register g
+                               ORDER BY g.scheme_id, g.fy_id, g.go_serial, g.go_id""")
+    conn.close()
+    return render_template("works_list.html", works=works, schemes=schemes, wards=wards,
+                            fys=fys, asset_types=asset_types, gos=gos)
+
+
+@app.route("/works/new", methods=["POST"])
+@require_role("ACCOUNT_OPERATOR", "ADMIN")
+def new_work():
+    conn = db.get_db()
+    go_id = int(request.form["go_id"]) if request.form.get("go_id") else None
+    go = db.fetchone(conn, """SELECT g.*, s.scheme_code, s.non_tender_allowed
+                              FROM go_register g JOIN schemes s ON s.scheme_id=g.scheme_id
+                              WHERE g.go_id=?""", (go_id,)) if go_id else None
     if not go:
         conn.close()
-        flash("शासनादेश नहीं मिला।", "error")
-        return redirect(url_for("finance"))
-    row = db.fetchone(conn, """SELECT COALESCE(MAX(installment_no), 0) AS m
-                               FROM installments WHERE go_id=?""", (go_id,))
-    no = int(row["m"] or 0) + 1
-    amount = to_float(request.form["amount_received"])
-    bank_account_id = int(request.form["bank_account_id"])
-    db.insert_and_get_id(conn, "installments", "installment_id",
-        ["go_id", "scheme_id", "installment_no", "amount_received", "received_date",
-         "bank_account_id", "letter_no", "letter_date", "bank_reference_no", "remarks", "created_by"],
-        (go_id, go["scheme_id"], no, amount, request.form["received_date"], bank_account_id,
-         request.form.get("letter_no"), request.form.get("letter_date") or None,
-         request.form.get("bank_reference_no"), request.form.get("remarks"), session["user_id"]))
-    post_cashbook_entry(conn, bank_account_id, go["scheme_id"], request.form["received_date"],
-                         f"किस्त प्राप्त — {go['go_number']} (किस्त {no})",
-                         receipt=amount, reference_type="INSTALLMENT", reference_id=go_id,
-                         created_by=session["user_id"])
+        flash("शासनादेश चुनना आवश्यक है — कार्य किसी न किसी शासनादेश से ही स्वीकृत होता है।", "error")
+        return redirect(url_for("works_list"))
+    if not go["fy_id"]:
+        conn.close()
+        flash("इस शासनादेश में वित्तीय वर्ष दर्ज नहीं है — पहले वित्त/आय में उसे ठीक करें।", "error")
+        return redirect(url_for("works_list"))
+
+    scheme_id, fy_id = go["scheme_id"], go["fy_id"]
+    names = request.form.getlist("work_name")
+    wards_in = request.form.getlist("ward_id")
+    assets_in = request.form.getlist("asset_type_id")
+    amounts_in = request.form.getlist("estimated_amount")
+    tenders_in = request.form.getlist("is_tendered")
+
+    def _at(lst, i):
+        return lst[i] if i < len(lst) else ""
+
+    created, skipped = [], 0
+    for i, raw_name in enumerate(names):
+        name = (raw_name or "").strip()
+        if not name:
+            continue
+        is_tendered = _at(tenders_in, i) != "0"
+        if not is_tendered and not go["non_tender_allowed"]:
+            skipped += 1
+            continue
+
+        r1 = db.fetchone(conn, "SELECT COALESCE(MAX(go_serial), 0) AS m FROM works WHERE go_id=?", (go_id,))
+        s_no = int(r1["m"] or 0) + 1
+        r2 = db.fetchone(conn, "SELECT COALESCE(MAX(fy_serial), 0) AS m FROM works WHERE fy_id=?", (fy_id,))
+        w_no = int(r2["m"] or 0) + 1
+        work_code = f"{go['go_number']}/S-{s_no:02d}/W-{w_no:03d}"
+
+        db.insert_and_get_id(conn, "works", "work_id",
+            ["work_code", "scheme_id", "ward_id", "fy_id", "asset_type_id", "work_name", "work_source",
+             "is_tendered", "estimated_amount", "status", "proposed_date",
+             "go_id", "go_serial", "fy_serial", "created_by"],
+            (work_code, scheme_id, _at(wards_in, i) or None, fy_id, _at(assets_in, i) or None,
+             name, request.form.get("work_source", "NEW"), is_tendered,
+             to_float(_at(amounts_in, i) or 0), "PROPOSED", today(),
+             go_id, s_no, w_no, session["user_id"]))
+        created.append(work_code)
+
     conn.commit()
+
+    if created:
+        chk = db.fetchone(conn, """SELECT COUNT(*) AS c, COALESCE(SUM(estimated_amount),0) AS amt
+                                   FROM works WHERE go_id=?""", (go_id,))
+        flash(f"{len(created)} कार्य दर्ज हुए — {created[0]}" +
+              (f" से {created[-1]}" if len(created) > 1 else ""), "success")
+        if go["works_count"] and int(chk["c"]) > int(go["works_count"]):
+            flash(f"ध्यान दें — इस शासनादेश में {go['works_count']} कार्य स्वीकृत थे, "
+                  f"पर अब {chk['c']} दर्ज हो गए।", "error")
+        if go["total_sanctioned_amount"] and float(chk["amt"]) > float(go["total_sanctioned_amount"]):
+            flash(f"ध्यान दें — कार्यों की कुल धनराशि {fmt_amount(chk['amt'])} है, "
+                  f"जो स्वीकृत {fmt_amount(go['total_sanctioned_amount'])} से अधिक है।", "error")
+    else:
+        flash("कोई कार्य दर्ज नहीं हुआ — कार्य का नाम भरना आवश्यक है।", "error")
+    if skipped:
+        flash(f"{skipped} कार्य छोड़े गए — इस मद में बिना टेंडर कार्य की अनुमति नहीं है।", "error")
+
     conn.close()
-    flash(f"किस्त {no} दर्ज हुई।", "success")
-    return redirect(url_for("finance"))
+    return redirect(url_for("works_list"))
+
 
 
 @app.route("/works/<int:work_id>")
